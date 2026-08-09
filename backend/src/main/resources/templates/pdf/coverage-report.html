@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Syllabus Coverage Report</title>
+    <style>
+        @page { size: A4; margin: 2.2cm 1.8cm; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #1f2430; font-size: 11px; }
+        .header { border-bottom: 2px solid #4338CA; padding-bottom: 10px; margin-bottom: 18px; }
+        .header .school { font-size: 20px; font-weight: bold; color: #312E81; }
+        .header .subtitle { font-size: 13px; color: #52525B; margin-top: 2px; }
+        .header .meta { font-size: 10px; color: #71717A; margin-top: 6px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th { background-color: #EEF2FF; color: #312E81; text-align: left; padding: 7px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid #C7D2FE; }
+        td { padding: 7px 8px; border-bottom: 1px solid #E4E4E7; font-size: 10.5px; }
+        tr:nth-child(even) td { background-color: #FAFAFA; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 9.5px; font-weight: bold; }
+        .badge-on-track { background-color: #DCFCE7; color: #166534; }
+        .badge-ahead { background-color: #DBEAFE; color: #1E40AF; }
+        .badge-behind { background-color: #FEE2E2; color: #991B1B; }
+        .badge-not-started { background-color: #F4F4F5; color: #52525B; }
+        .footer { margin-top: 24px; font-size: 9px; color: #A1A1AA; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="school" th:text="${schoolName}">School Name</div>
+        <div class="subtitle">Syllabus Coverage Report</div>
+        <div class="meta">Generated on <span th:text="${generatedAt}">date</span></div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Subject</th>
+                <th>Teacher</th>
+                <th>Planned to date</th>
+                <th>Covered</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="row : ${rows}">
+                <td th:text="${row.classSectionName}">Class</td>
+                <td th:text="${row.subjectName}">Subject</td>
+                <td th:text="${row.teacherName}">Teacher</td>
+                <td th:text="${row.plannedToDateCount}">0</td>
+                <td th:text="${row.coveredCount}">0</td>
+                <td>
+                    <span th:switch="${row.status}" class="badge">
+                        <span th:case="'ON_TRACK'" class="badge badge-on-track">On track</span>
+                        <span th:case="'AHEAD'" class="badge badge-ahead">Ahead</span>
+                        <span th:case="'BEHIND'" class="badge badge-behind">Behind</span>
+                        <span th:case="*" class="badge badge-not-started">Not started</span>
+                    </span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer">EduTrack AI &#8212; auto-generated syllabus pacing report</div>
+</body>
+</html>
