@@ -12,8 +12,12 @@ import { StatusBadge } from "../../components/Badge";
 import { getMySubjects } from "../../api/subjects";
 import * as lessonPlanApi from "../../api/lessonPlan";
 import * as syllabusApi from "../../api/syllabus";
+import * as calendarApi from "../../api/calendar";
 import { errorMessage } from "../../api/client";
 import type { LessonPlanEntry, Subject, Topic } from "../../types";
+import type { DayOfWeek } from "../../types/profile";
+
+const JS_DAY_TO_ENUM: DayOfWeek[] = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 
 const MISS_REASONS = ["Teacher on leave", "Other school engagement", "Ran out of time", "Other"];
 
@@ -25,8 +29,11 @@ export function LessonPlanPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddTopic, setShowAddTopic] = useState(false);
+  const [dayOffReason, setDayOffReason] = useState<string | null>(null);
 
-  const today = new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const now = new Date();
+  const today = now.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   useEffect(() => {
     getMySubjects()
@@ -36,6 +43,17 @@ export function LessonPlanPage() {
       })
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
+
+    calendarApi
+      .getMonthView(now.getFullYear(), now.getMonth() + 1)
+      .then((view) => {
+        const todayDayOfWeek = JS_DAY_TO_ENUM[now.getDay()];
+        const holiday = view.holidays.find((h) => todayIso >= h.startDate && todayIso <= h.endDate);
+        if (holiday) setDayOffReason(`${holiday.name} — no school today.`);
+        else if (view.weekendDays.includes(todayDayOfWeek)) setDayOffReason("It's the weekend — no school today.");
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -141,8 +159,10 @@ export function LessonPlanPage() {
           <div className="space-y-3">
             {entries.length === 0 ? (
               <EmptyState
-                title="Nothing planned for today"
-                description="This subject's syllabus may not have any topics left, or none uploaded yet."
+                title={dayOffReason ? "No school today" : "Nothing planned for today"}
+                description={
+                  dayOffReason ?? "This subject's syllabus may not have any topics left, or none uploaded yet."
+                }
               />
             ) : (
               entries.map((entry) => <LessonPlanCard key={entry.id} entry={entry} onCovered={handleConfirmCovered} onMissed={handleConfirmMissed} />)

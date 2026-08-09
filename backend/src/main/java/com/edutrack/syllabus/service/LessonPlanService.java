@@ -1,5 +1,6 @@
 package com.edutrack.syllabus.service;
 
+import com.edutrack.calendar.service.SchoolCalendarService;
 import com.edutrack.common.ApiException;
 import com.edutrack.org.entity.Role;
 import com.edutrack.org.entity.Subject;
@@ -30,6 +31,7 @@ public class LessonPlanService {
     private final TopicRepository topicRepository;
     private final SubjectRepository subjectRepository;
     private final UserRepository userRepository;
+    private final SchoolCalendarService schoolCalendarService;
 
     private static final Set<LessonPlanStatus> OPEN_STATUSES = Set.of(LessonPlanStatus.PLANNED, LessonPlanStatus.RESCHEDULED);
 
@@ -47,6 +49,10 @@ public class LessonPlanService {
 
         if (!existing.isEmpty()) {
             return existing.stream().map(LessonPlanEntryResponse::from).toList();
+        }
+
+        if (schoolCalendarService.isNonTeachingDay(currentUser.getSchoolId(), date)) {
+            return List.of();
         }
 
         Topic suggestion = suggestNextTopic(subjectId, date);
@@ -131,9 +137,12 @@ public class LessonPlanService {
 
     private void rescheduleTopic(LessonPlanEntry missedEntry) {
         Topic topic = missedEntry.getTopic();
+        Long schoolId = CurrentUser.get().getSchoolId();
         LocalDate candidate = missedEntry.getPlannedDate().plusDays(1);
         LocalDate cutoff = missedEntry.getPlannedDate().plusDays(30);
-        while (candidate.isBefore(cutoff) && lessonPlanEntryRepository.findByTopicIdAndPlannedDate(topic.getId(), candidate).isPresent()) {
+        while (candidate.isBefore(cutoff)
+                && (schoolCalendarService.isNonTeachingDay(schoolId, candidate)
+                        || lessonPlanEntryRepository.findByTopicIdAndPlannedDate(topic.getId(), candidate).isPresent())) {
             candidate = candidate.plusDays(1);
         }
         LessonPlanEntry rescheduled = new LessonPlanEntry(topic, missedEntry.getTeacher(), candidate);

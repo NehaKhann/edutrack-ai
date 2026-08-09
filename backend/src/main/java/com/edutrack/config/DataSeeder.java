@@ -1,5 +1,7 @@
 package com.edutrack.config;
 
+import com.edutrack.calendar.entity.SchoolHoliday;
+import com.edutrack.calendar.repository.SchoolHolidayRepository;
 import com.edutrack.org.entity.ClassSection;
 import com.edutrack.org.entity.Role;
 import com.edutrack.org.entity.School;
@@ -17,6 +19,10 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.Set;
+
 @Component
 @RequiredArgsConstructor
 public class DataSeeder implements CommandLineRunner {
@@ -28,6 +34,7 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final ClassSectionRepository classSectionRepository;
     private final SubjectRepository subjectRepository;
+    private final SchoolHolidayRepository schoolHolidayRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${seed.enabled:true}")
@@ -39,7 +46,9 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        School school = schoolRepository.save(new School("Greenwood Public School"));
+        School school = new School("Greenwood Public School");
+        school.setWeekendDays(Set.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY));
+        school = schoolRepository.save(school);
 
         User admin = userRepository.save(new User("Admin", "admin@edutrack.school",
                 passwordEncoder.encode(DEMO_PASSWORD), Role.ADMIN, school));
@@ -57,6 +66,10 @@ public class DataSeeder implements CommandLineRunner {
         subjectRepository.save(new Subject("English", grade6, teacherBilal));
         subjectRepository.save(new Subject("Mathematics", grade7, teacherSana));
         subjectRepository.save(new Subject("Urdu", grade7, teacherBilal));
+
+        LocalDate today = LocalDate.now();
+        schoolHolidayRepository.save(new SchoolHoliday(school, "Public Holiday", today.plusDays(5), today.plusDays(5)));
+        schoolHolidayRepository.save(new SchoolHoliday(school, "Mid-Term Break", today.plusDays(20), today.plusDays(26)));
 
         log.info("========================================================");
         log.info(" EduTrack AI demo data seeded for '{}'", school.getName());

@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDaysIcon,
+  CalendarIcon,
   BookOpenIcon,
   Squares2X2Icon,
   ArrowRightStartOnRectangleIcon,
@@ -19,11 +20,13 @@ const teacherNav = [
   { to: "/teacher/lesson-plan", label: "Today's Plan", icon: CalendarDaysIcon },
   { to: "/teacher/syllabus", label: "Syllabus", icon: BookOpenIcon },
   { to: "/teacher/profile", label: "My Profile", icon: UserCircleIcon },
+  { to: "/calendar", label: "Calendar", icon: CalendarIcon },
 ];
 
 const principalNav = [
   { to: "/principal/coverage", label: "Coverage Grid", icon: Squares2X2Icon },
   { to: "/principal/teachers", label: "Teacher Directory", icon: UsersIcon },
+  { to: "/calendar", label: "Calendar", icon: CalendarIcon },
 ];
 
 export function AppLayout() {

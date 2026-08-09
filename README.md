@@ -84,6 +84,10 @@ None of these are hardcoded with production-breaking defaults — every default 
 - Every teacher has a profile: photo (JPG/PNG/WebP upload), designation, bio, and a day/time timetable — subjects and classes taught are derived live from the existing data, never duplicated.
 - Principal-facing Teacher Directory: a card grid of every teacher, with a detail view (profile + timetable) for each.
 
+**School Calendar** (folded into this milestone):
+- Configurable weekend days and Principal-managed holiday date ranges, visible to everyone as a month-grid calendar.
+- Wired directly into the scheduling logic, not just cosmetic: "Today's Plan" never auto-suggests a topic on a weekend/holiday, and missed-lesson auto-reschedule skips over them to land on the next real teaching day.
+
 Not yet built: Pillars 2–7 (AI test generation, handwritten grading, analytics, feedback loop, head-of-school reporting) and the Student/Parent portals (explicitly out of scope per the product spec). Live deployment is prepared for but not yet executed — see [Deployment](#deployment).
 
 ## Test scenarios (manual QA checklist)
@@ -117,6 +121,13 @@ Not yet built: Pillars 2–7 (AI test generation, handwritten grading, analytics
 - [ ] Add and delete timetable slots (with and without a linked subject).
 - [ ] As Principal, open the Teacher Directory, confirm both teachers appear with correct photos/designations/subject counts, and their detail view matches what each teacher set.
 - [ ] Confirm one teacher cannot edit another's profile (there is no cross-teacher write endpoint — only `/me`).
+
+**School Calendar**
+- [ ] As Principal, open Calendar, add a holiday spanning a few days → it renders on the month grid with its name.
+- [ ] Toggle weekend days (e.g. switch to Sunday-only) → grid updates immediately.
+- [ ] As Teacher, open Calendar → same data, but no "Add holiday" button or weekend toggle (read-only).
+- [ ] On a weekend or holiday date, "Today's Plan" shows "No school today" instead of auto-suggesting a topic (test via a subject with an active syllabus, checking a known off day).
+- [ ] Confirm a lesson as "Not delivered" right before a weekend/holiday → the auto-rescheduled entry lands on the next real school day, skipping over both.
 
 **Env-driven config**
 - [ ] Confirm `.env` is git-ignored and never committed.
