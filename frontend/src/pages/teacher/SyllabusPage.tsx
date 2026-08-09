@@ -31,6 +31,7 @@ export function SyllabusPage() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
 
   useEffect(() => {
@@ -74,9 +75,11 @@ export function SyllabusPage() {
     if (!syllabusId) return;
     setExtracting(true);
     setError(null);
+    setWarning(null);
     try {
-      const extracted = await syllabusApi.extractTopics(syllabusId);
+      const { data: extracted, message } = await syllabusApi.extractTopics(syllabusId);
       setTopics(extracted);
+      setWarning(message);
       await refreshSyllabi(syllabusId);
     } catch (e) {
       setError(errorMessage(e));
@@ -105,6 +108,11 @@ export function SyllabusPage() {
       {error && (
         <div className="mb-4">
           <Alert type="error">{error}</Alert>
+        </div>
+      )}
+      {warning && (
+        <div className="mb-4">
+          <Alert type="warning">{warning}</Alert>
         </div>
       )}
 

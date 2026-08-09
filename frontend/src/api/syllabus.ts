@@ -1,4 +1,4 @@
-import { apiClient, unwrap } from "./client";
+import { apiClient, unwrap, unwrapWithMessage } from "./client";
 import type { SyllabusDto, Topic } from "../types";
 
 export function listSyllabi(subjectId: number): Promise<SyllabusDto[]> {
@@ -27,8 +27,8 @@ export function uploadSyllabus(params: {
   );
 }
 
-export function extractTopics(syllabusId: number): Promise<Topic[]> {
-  return unwrap(apiClient.post(`/api/syllabus/${syllabusId}/extract-topics`));
+export function extractTopics(syllabusId: number): Promise<{ data: Topic[]; message: string | null }> {
+  return unwrapWithMessage(apiClient.post(`/api/syllabus/${syllabusId}/extract-topics`));
 }
 
 export function listTopics(syllabusId: number): Promise<Topic[]> {

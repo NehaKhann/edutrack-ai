@@ -40,6 +40,10 @@ public class SyllabusController {
     @PostMapping("/{id}/extract-topics")
     public ApiResponse<List<TopicResponse>> extractTopics(@PathVariable Long id) {
         Syllabus syllabus = syllabusService.getOwned(id);
-        return ApiResponse.ok(topicExtractionService.extractAndSave(syllabus));
+        var result = topicExtractionService.extractAndSave(syllabus);
+        String message = result.weeksAdjusted()
+                ? "Some week numbers looked unusual and were auto-corrected — please double-check the dates below."
+                : null;
+        return ApiResponse.ok(result.topics(), message);
     }
 }

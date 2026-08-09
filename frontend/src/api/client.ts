@@ -31,6 +31,10 @@ export function unwrap<T>(promise: Promise<{ data: ApiResponse<T> }>): Promise<T
   return promise.then((res) => res.data.data);
 }
 
+export function unwrapWithMessage<T>(promise: Promise<{ data: ApiResponse<T> }>): Promise<{ data: T; message: string | null }> {
+  return promise.then((res) => ({ data: res.data.data, message: res.data.message }));
+}
+
 export function errorMessage(err: unknown): string {
   const anyErr = err as any;
   return anyErr?.response?.data?.message || anyErr?.message || "Something went wrong. Please try again.";
