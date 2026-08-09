@@ -30,19 +30,18 @@ public class Syllabus {
     @Column(name = "term_start_date", nullable = false)
     private LocalDate termStartDate;
 
-    @Column(name = "uploaded_file_ref")
-    private String uploadedFileRef;
+    @Column(nullable = false)
+    private boolean confirmed = false;
 
-    @Column(name = "raw_extracted_text", columnDefinition = "TEXT")
-    private String rawExtractedText;
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
-    public Syllabus(Subject subject, String term, LocalDate termStartDate, String uploadedFileRef) {
+    public Syllabus(Subject subject, String term, LocalDate termStartDate) {
         this.subject = subject;
         this.term = term;
         this.termStartDate = termStartDate;
-        this.uploadedFileRef = uploadedFileRef;
     }
 }

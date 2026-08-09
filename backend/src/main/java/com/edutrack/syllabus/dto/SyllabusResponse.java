@@ -2,6 +2,7 @@ package com.edutrack.syllabus.dto;
 
 import com.edutrack.syllabus.entity.Syllabus;
 
+import java.time.Instant;
 import java.time.LocalDate;
 
 public record SyllabusResponse(
@@ -10,14 +11,15 @@ public record SyllabusResponse(
         LocalDate termStartDate,
         Long subjectId,
         String subjectName,
-        String uploadedFileRef,
+        boolean confirmed,
+        Instant confirmedAt,
         boolean hasExtractedTopics
 ) {
     public static SyllabusResponse from(Syllabus s, boolean hasExtractedTopics) {
         return new SyllabusResponse(
                 s.getId(), s.getTerm(), s.getTermStartDate(),
                 s.getSubject().getId(), s.getSubject().getName(),
-                s.getUploadedFileRef(), hasExtractedTopics
+                s.isConfirmed(), s.getConfirmedAt(), hasExtractedTopics
         );
     }
 }

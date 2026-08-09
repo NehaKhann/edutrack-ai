@@ -6,7 +6,9 @@ import com.edutrack.llm.LlmClient;
 import com.edutrack.syllabus.dto.TopicExtractionResult;
 import com.edutrack.syllabus.dto.TopicResponse;
 import com.edutrack.syllabus.entity.Syllabus;
+import com.edutrack.syllabus.entity.SyllabusDocument;
 import com.edutrack.syllabus.entity.Topic;
+import com.edutrack.syllabus.repository.SyllabusDocumentRepository;
 import com.edutrack.syllabus.repository.TopicRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -85,10 +87,20 @@ public class TopicExtractionService {
 
     private final LlmClient llmClient;
     private final TopicRepository topicRepository;
+    private final SyllabusDocumentRepository syllabusDocumentRepository;
 
     @Transactional
     public TopicExtractionResult extractAndSave(Syllabus syllabus) {
-        String syllabusExcerpt = syllabus.getRawExtractedText();
+        if (!syllabus.isConfirmed()) {
+            throw ApiException.badRequest("Please confirm the syllabus content before generating a plan.");
+        }
+
+        List<SyllabusDocument> documents = syllabusDocumentRepository.findBySyllabusIdOrderByOrderIndexAsc(syllabus.getId());
+        if (documents.isEmpty()) {
+            throw ApiException.badRequest("This syllabus has no uploaded documents.");
+        }
+        String syllabusExcerpt = documents.stream().map(SyllabusDocument::getExtractedText)
+                .reduce((a, b) -> a + "\n\n" + b).orElse("");
         if (syllabusExcerpt.length() > MAX_SYLLABUS_CHARS) {
             syllabusExcerpt = syllabusExcerpt.substring(0, MAX_SYLLABUS_CHARS);
         }

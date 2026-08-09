@@ -1,22 +1,27 @@
 import { apiClient, unwrap, unwrapWithMessage } from "./client";
-import type { SyllabusDto, Topic } from "../types";
+import type { SyllabusDto, SyllabusDocument, SyllabusUploadResult, Topic } from "../types";
 
 export function listSyllabi(subjectId: number): Promise<SyllabusDto[]> {
   return unwrap(apiClient.get("/api/syllabus", { params: { subjectId } }));
 }
 
-export function uploadSyllabus(params: {
+function filesFormData(files: File[]): FormData {
+  const form = new FormData();
+  files.forEach((f) => form.append("files", f));
+  return form;
+}
+
+export function createSyllabus(params: {
   subjectId: number;
   term: string;
   termStartDate: string;
-  file: File;
+  files: File[];
   onProgress?: (pct: number) => void;
-}): Promise<SyllabusDto> {
-  const form = new FormData();
+}): Promise<SyllabusUploadResult> {
+  const form = filesFormData(params.files);
   form.append("subjectId", String(params.subjectId));
   form.append("term", params.term);
   form.append("termStartDate", params.termStartDate);
-  form.append("file", params.file);
   return unwrap(
     apiClient.post("/api/syllabus", form, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -25,6 +30,42 @@ export function uploadSyllabus(params: {
       },
     })
   );
+}
+
+export function addDocuments(
+  syllabusId: number,
+  files: File[],
+  onProgress?: (pct: number) => void
+): Promise<SyllabusUploadResult> {
+  const form = filesFormData(files);
+  return unwrap(
+    apiClient.post(`/api/syllabus/${syllabusId}/documents`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (evt) => {
+        if (onProgress && evt.total) onProgress(Math.round((evt.loaded / evt.total) * 100));
+      },
+    })
+  );
+}
+
+export function listDocuments(syllabusId: number): Promise<SyllabusDocument[]> {
+  return unwrap(apiClient.get(`/api/syllabus/${syllabusId}/documents`));
+}
+
+export function updateDocumentText(documentId: number, extractedText: string): Promise<SyllabusDocument> {
+  return unwrap(apiClient.put(`/api/syllabus/documents/${documentId}`, { extractedText }));
+}
+
+export function deleteDocument(documentId: number): Promise<void> {
+  return unwrap(apiClient.delete(`/api/syllabus/documents/${documentId}`));
+}
+
+export function confirmSyllabus(syllabusId: number): Promise<SyllabusDto> {
+  return unwrap(apiClient.post(`/api/syllabus/${syllabusId}/confirm`));
+}
+
+export function unconfirmSyllabus(syllabusId: number): Promise<SyllabusDto> {
+  return unwrap(apiClient.post(`/api/syllabus/${syllabusId}/unconfirm`));
 }
 
 export function extractTopics(syllabusId: number): Promise<{ data: Topic[]; message: string | null }> {

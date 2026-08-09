@@ -23,8 +23,28 @@ export interface SyllabusDto {
   termStartDate: string;
   subjectId: number;
   subjectName: string;
-  uploadedFileRef: string | null;
+  confirmed: boolean;
+  confirmedAt: string | null;
   hasExtractedTopics: boolean;
+}
+
+export interface SyllabusDocument {
+  id: number;
+  syllabusId: number;
+  originalFilename: string;
+  extractedText: string;
+  orderIndex: number;
+}
+
+export interface FailedFile {
+  filename: string;
+  reason: string;
+}
+
+export interface SyllabusUploadResult {
+  syllabus: SyllabusDto;
+  documents: SyllabusDocument[];
+  failedFiles: FailedFile[];
 }
 
 export interface Topic {

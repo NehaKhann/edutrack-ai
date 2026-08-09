@@ -74,8 +74,8 @@ None of these are hardcoded with production-breaking defaults — every default 
 **Foundation**: JWT auth, TEACHER/PRINCIPAL/ADMIN roles, multi-tenant school/class/subject data model, env-switchable LLM client (Groq/Ollama), server-side PDF export pipeline, responsive app shell with a mobile drawer nav.
 
 **Pillar 1 — Syllabus Planning & Pacing**:
-- Upload a syllabus as **PDF, Word (.doc/.docx), or a photo/scan (JPG/PNG/WebP)** — images go through Tesseract OCR (English + Urdu), documents through Apache POI, PDFs through PDFBox. **Scanned/photographed PDFs with no real text layer are detected automatically and routed through OCR too** (each page is rendered to an image and OCR'd), not just direct image uploads.
-- AI extracts topics and maps them to **either week ranges ("Week 1-2") or calendar months ("April'26", "Month of August")** — whichever style the source document actually uses — with full manual add/edit/delete/reorder as a correction path. Real-world school syllabi are very often month-organized, not week-organized, so both are treated as first-class, not just week-based.
+- **Upload → Review/Edit → Confirm → Plan**, a deliberate multi-step flow rather than "upload and hope": upload one or more scanned/typed documents at once (PDF, Word .doc/.docx, or a photo/scan JPG/PNG/WebP — images go through Tesseract OCR in English + Urdu, PDFs with no real text layer are automatically rendered page-by-page and OCR'd too), see the extracted text exactly as pulled from each file, hand-correct anything wrong, then explicitly **Confirm** the syllabus. A second **Planning** tab — where AI topic extraction and the week/month topic list live — stays locked until that confirmation happens, both in the UI and enforced server-side (the extraction endpoint itself rejects an unconfirmed syllabus, so it's a real gate, not just a frontend affordance). Uploading multiple files reports partial success — one unreadable file in a batch doesn't block the rest.
+- AI extracts topics and maps them to **either week ranges ("Week 1-2") or calendar months ("April'26", "Month of August")** — whichever style the source document actually uses. Real-world school syllabi are very often month-organized, not week-organized, so both are treated as first-class, not just week-based.
 - Topic-extraction JSON parsing retries up to 3 times before failing — small local LLMs (e.g. Ollama's llama3.2) occasionally emit malformed JSON, especially on noisy OCR'd text, so this is a real resilience measure, not a hypothetical one.
 - Daily "Today's Plan" auto-suggests the next open topic, with one-tap **Covered as planned** / **Not delivered** (+ reason).
 - Missed lessons auto-reschedule to the next open date for that topic — nothing silently disappears.
@@ -109,12 +109,17 @@ Tested directly against real phone-photographed syllabus pages (English and Urdu
 - [ ] Log in as Teacher and Principal; confirm each only sees their own nav items and cannot reach the other's routes directly by URL.
 - [ ] Confirm a Teacher's JWT is rejected on `/api/principal/**` endpoints (403).
 
-**Syllabus upload & AI extraction**
-- [ ] Upload a PDF syllabus → topics extracted with plausible week ranges.
-- [ ] Upload a `.docx` syllabus → same.
-- [ ] Upload a photo/scan of a printed syllabus (JPG or PNG) → OCR extracts readable text and topics are generated (expect occasional imperfect week-numbering on OCR'd text — this is a real limitation of OCR+LLM, correctable via the manual topic editor).
-- [ ] Try an unsupported file type (e.g. `.txt`) → clear rejection message, no crash.
+**Syllabus upload → review → confirm → plan**
+- [ ] Click "New Syllabus", select 2-3 files at once (mix PDF/.docx/image types) → each appears as its own editable card with the text actually extracted from that file.
+- [ ] Include one unsupported file (e.g. `.txt`) in a batch with good files → the good ones still upload; the bad one is reported by name with a reason, nothing silently fails.
+- [ ] Edit a card's text and save → persists on reload.
+- [ ] Delete a card → removed from the list.
+- [ ] Click the "Planning" tab before confirming → blocked with a clear message, tab shows a lock icon.
+- [ ] Click "Confirm Syllabus" → Planning unlocks automatically; documents become read-only with a "✓ Confirmed" badge.
+- [ ] Click "Edit again" → Planning re-locks, documents become editable again, nothing already extracted is deleted.
+- [ ] In Planning, click "Extract with AI" → topics generated from the (possibly hand-edited) confirmed text, spanning all uploaded documents combined.
 - [ ] Manually add, edit, reorder, and delete a topic.
+- [ ] Via curl/Postman, call `POST /api/syllabus/{id}/extract-topics` directly on an unconfirmed syllabus → confirm it's rejected server-side (400), proving the gate isn't just a frontend affordance.
 
 **Lesson planning**
 - [ ] Confirm a lesson "Covered as planned" → topic marked covered.
