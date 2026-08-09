@@ -74,8 +74,9 @@ None of these are hardcoded with production-breaking defaults — every default 
 **Foundation**: JWT auth, TEACHER/PRINCIPAL/ADMIN roles, multi-tenant school/class/subject data model, env-switchable LLM client (Groq/Ollama), server-side PDF export pipeline, responsive app shell with a mobile drawer nav.
 
 **Pillar 1 — Syllabus Planning & Pacing**:
-- Upload a syllabus as **PDF, Word (.doc/.docx), or a photo/scan (JPG/PNG/WebP)** — images go through Tesseract OCR, documents through Apache POI, PDFs through PDFBox, all feeding the same AI topic-extraction pipeline.
-- AI extracts topics and maps them to calendar weeks from a term start date; full manual add/edit/delete/reorder as a correction path.
+- Upload a syllabus as **PDF, Word (.doc/.docx), or a photo/scan (JPG/PNG/WebP)** — images go through Tesseract OCR (English + Urdu), documents through Apache POI, PDFs through PDFBox. **Scanned/photographed PDFs with no real text layer are detected automatically and routed through OCR too** (each page is rendered to an image and OCR'd), not just direct image uploads.
+- AI extracts topics and maps them to **either week ranges ("Week 1-2") or calendar months ("April'26", "Month of August")** — whichever style the source document actually uses — with full manual add/edit/delete/reorder as a correction path. Real-world school syllabi are very often month-organized, not week-organized, so both are treated as first-class, not just week-based.
+- Topic-extraction JSON parsing retries up to 3 times before failing — small local LLMs (e.g. Ollama's llama3.2) occasionally emit malformed JSON, especially on noisy OCR'd text, so this is a real resilience measure, not a hypothetical one.
 - Daily "Today's Plan" auto-suggests the next open topic, with one-tap **Covered as planned** / **Not delivered** (+ reason).
 - Missed lessons auto-reschedule to the next open date for that topic — nothing silently disappears.
 - Principal's Coverage Grid: Class × Subject planned-vs-covered status (On track / Ahead / Behind / Not started), with drill-down and a PDF export.
@@ -89,6 +90,14 @@ None of these are hardcoded with production-breaking defaults — every default 
 - Wired directly into the scheduling logic, not just cosmetic: "Today's Plan" never auto-suggests a topic on a weekend/holiday, and missed-lesson auto-reschedule skips over them to land on the next real teaching day.
 
 Not yet built: Pillars 2–7 (AI test generation, handwritten grading, analytics, feedback loop, head-of-school reporting) and the Student/Parent portals (explicitly out of scope per the product spec). Live deployment is prepared for but not yet executed — see [Deployment](#deployment).
+
+### Known limitations (verified against real school syllabi, not hypothetical)
+
+Tested directly against real phone-photographed syllabus pages (English and Urdu, week- and month-organized, single- and multi-column layouts) — not just clean synthetic files. This surfaced and fixed several real bugs (an OCR-language auto-detector that was letting stray Urdu noise corrupt English documents, and a prompt-example-leakage bug where the AI occasionally echoed back this codebase's own instruction examples as if they were real topics). What's left is a genuine, not-yet-solved ceiling rather than a bug:
+
+- **Urdu OCR on a real, skewed, low-resolution photo is still noticeably imperfect.** Urdu's Nastaliq script is one of the hardest OCR targets in general — even Tesseract's highest-accuracy model struggles on classroom-photo-quality scans of dense tabular Urdu text. A cleaner/flatter scan, better lighting, or a typed Word/PDF version (instead of a phone photo) will extract far better than a skewed photo will. Manual topic entry remains the practical fallback for low-quality Urdu scans.
+- **Multi-column layouts** (e.g. a Math syllabus with separate Arithmetic/Algebra/Geometry columns per month) sometimes get their columns cross-contaminated in the extracted text, since OCR and PDF text extraction both flatten a 2D table into a 1D text stream — the AI does its best with what it's given, but occasionally merges two adjacent columns' content into one garbled title.
+- **Local Ollama models (llama3.2 3B) are noticeably less reliable than a larger hosted model** at consistently picking week-mode vs. month-mode, and at avoiding occasional malformed JSON — both are mitigated (retries, sanity-clamping) but not eliminated. Production `LLM_PROVIDER=groq` should perform meaningfully better on all of the above since Groq's models are far larger.
 
 ## Test scenarios (manual QA checklist)
 

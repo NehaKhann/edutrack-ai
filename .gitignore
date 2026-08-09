@@ -17,6 +17,9 @@ frontend/vite.config.d.ts
 # Storage / uploads
 backend/storage/
 
+# Real school documents used for local testing — never publish these
+Scanned Document*.pdf
+
 # IDE
 .idea/
 *.iml

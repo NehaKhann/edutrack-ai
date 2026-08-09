@@ -11,6 +11,11 @@ public class ApiException extends RuntimeException {
         this.status = status;
     }
 
+    public ApiException(HttpStatus status, String message, Throwable cause) {
+        super(message, cause);
+        this.status = status;
+    }
+
     public HttpStatus getStatus() {
         return status;
     }
@@ -33,5 +38,9 @@ public class ApiException extends RuntimeException {
 
     public static ApiException internal(String message) {
         return new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, message);
+    }
+
+    public static ApiException internal(String message, Throwable cause) {
+        return new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, message, cause);
     }
 }

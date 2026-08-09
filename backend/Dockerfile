@@ -8,6 +8,12 @@ RUN mvn -B package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng
+# Alpine's package repo has no Urdu language pack; fetch it directly from the official release. Urdu OCR is
+# hard enough on real scans that the "best" (slower, most accurate) model is worth it over "fast" here.
+RUN apk add --no-cache --virtual .fetch-deps curl \
+    && curl -fL -o /usr/share/tessdata/urd.traineddata \
+       https://github.com/tesseract-ocr/tessdata_best/raw/main/urd.traineddata \
+    && apk del .fetch-deps
 COPY --from=build /app/target/backend-0.1.0.jar app.jar
 RUN mkdir -p /app/storage
 ENV OCR_TESSDATA_PATH=/usr/share/tessdata
