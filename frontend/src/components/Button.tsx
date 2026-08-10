@@ -17,10 +17,12 @@ interface Props extends NativeButtonProps {
 }
 
 const variantClasses: Record<Variant, string> = {
-  primary: "bg-brand-600 text-white hover:bg-brand-700 focus-visible:ring-brand-500 shadow-sm disabled:bg-brand-300",
+  primary:
+    "bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-glow-brand hover:shadow-[0_10px_30px_-6px_rgba(91,79,239,0.6)] focus-visible:ring-brand-500 disabled:from-brand-300 disabled:to-brand-300 disabled:shadow-none",
   secondary:
-    "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 focus-visible:ring-brand-500 shadow-sm disabled:text-slate-400",
-  danger: "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 shadow-sm disabled:bg-red-300",
+    "bg-white/80 text-slate-700 border border-slate-200 backdrop-blur-sm hover:bg-white hover:shadow-md focus-visible:ring-brand-500 shadow-sm disabled:text-slate-400",
+  danger:
+    "bg-gradient-to-br from-coral-600 to-coral-500 text-white shadow-glow-coral hover:shadow-[0_10px_30px_-6px_rgba(255,107,85,0.6)] focus-visible:ring-coral-500 disabled:from-coral-100 disabled:to-coral-100 disabled:shadow-none",
   ghost: "bg-transparent text-slate-600 hover:bg-slate-100 focus-visible:ring-brand-500",
 };
 
@@ -34,10 +36,12 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
     return (
       <motion.button
         ref={ref}
+        whileHover={disabled || loading ? undefined : { scale: 1.02, y: -1 }}
         whileTap={disabled || loading ? undefined : { scale: 0.97 }}
+        transition={{ type: "spring", stiffness: 400, damping: 22 }}
         disabled={disabled || loading}
         className={clsx(
-          "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors",
+          "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-[background,box-shadow,color] duration-200",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
           "disabled:cursor-not-allowed",
           variantClasses[variant],

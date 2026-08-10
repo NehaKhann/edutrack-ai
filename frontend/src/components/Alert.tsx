@@ -5,14 +5,14 @@ import { ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/so
 type AlertType = "error" | "success" | "warning";
 
 const toneClasses: Record<AlertType, string> = {
-  error: "border-red-200 bg-red-50 text-red-800",
-  success: "border-green-200 bg-green-50 text-green-800",
+  error: "border-coral-100 bg-coral-50 text-coral-700",
+  success: "border-teal-100 bg-teal-50 text-teal-700",
   warning: "border-amber-200 bg-amber-50 text-amber-800",
 };
 
 export function Alert({ type = "error", children }: { type?: AlertType; children: ReactNode }) {
   return (
-    <div className={clsx("flex items-start gap-2 rounded-lg border px-3 py-2 text-sm", toneClasses[type])}>
+    <div className={clsx("flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm shadow-sm", toneClasses[type])}>
       {type === "success" ? (
         <CheckCircleIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
       ) : (

@@ -14,8 +14,10 @@ import {
   MagnifyingGlassIcon,
   Bars3Icon,
   XMarkIcon,
+  BellIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../auth/AuthContext";
+import { AmbientBackground } from "../components/AmbientBackground";
 
 const teacherNav = [
   { to: "/teacher/lesson-plan", label: "Today's Plan", icon: CalendarDaysIcon },
@@ -31,6 +33,15 @@ const principalNav = [
   { to: "/search", label: "Search", icon: MagnifyingGlassIcon },
   { to: "/calendar", label: "Calendar", icon: CalendarIcon },
 ];
+
+function initialsOf(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+}
 
 export function AppLayout() {
   const { user, logout } = useAuth();
@@ -48,18 +59,18 @@ export function AppLayout() {
 
   const sidebarContent = (
     <>
-      <div className="flex items-center gap-2 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600">
+      <div className="flex items-center gap-2.5 px-5 py-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 shadow-glow-brand">
           <AcademicCapIcon className="h-5 w-5 text-white" />
         </div>
         <div>
-          <div className="text-sm font-bold leading-tight text-white">EduTrack AI</div>
+          <div className="font-display text-sm font-bold leading-tight text-white">EduTrack AI</div>
           <div className="text-[11px] text-brand-300">School Operations</div>
         </div>
         <button
           onClick={() => setMobileNavOpen(false)}
           aria-label="Close menu"
-          className="ml-auto rounded-lg p-1.5 text-brand-200 hover:bg-brand-800 md:hidden"
+          className="ml-auto rounded-lg p-1.5 text-brand-200 hover:bg-white/10 md:hidden"
         >
           <XMarkIcon className="h-5 w-5" />
         </button>
@@ -72,8 +83,10 @@ export function AppLayout() {
             to={item.to}
             className={({ isActive }) =>
               clsx(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive ? "bg-brand-700 text-white shadow-sm" : "text-brand-200 hover:bg-brand-800 hover:text-white"
+                "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "bg-gradient-to-r from-brand-600/90 to-brand-500/70 text-white shadow-glow-brand"
+                  : "text-brand-200 hover:translate-x-0.5 hover:bg-white/8 hover:text-white"
               )
             }
           >
@@ -83,10 +96,10 @@ export function AppLayout() {
         ))}
       </nav>
 
-      <div className="border-t border-brand-800 px-3 py-3">
+      <div className="border-t border-white/10 px-3 py-3">
         <button
           onClick={logout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-brand-200 transition-colors hover:bg-brand-800 hover:text-white"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-brand-200 transition-colors hover:bg-white/8 hover:text-white"
         >
           <ArrowRightStartOnRectangleIcon className="h-5 w-5" />
           Sign out
@@ -96,9 +109,17 @@ export function AppLayout() {
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50">
+    <div className="flex h-screen w-full overflow-hidden">
+      <AmbientBackground />
+
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 flex-col bg-brand-900 text-brand-100 md:flex">{sidebarContent}</aside>
+      <aside className="relative z-10 hidden w-64 flex-shrink-0 flex-col overflow-hidden bg-gradient-to-b from-navy-900 via-navy-800 to-brand-900 text-brand-100 shadow-glass md:flex">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+        />
+        <div className="relative z-10 flex h-full flex-col">{sidebarContent}</div>
+      </aside>
 
       {/* Mobile drawer */}
       <AnimatePresence>
@@ -108,15 +129,15 @@ export function AppLayout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-slate-900/50 md:hidden"
+              className="fixed inset-0 z-40 bg-navy-900/60 backdrop-blur-sm md:hidden"
               onClick={() => setMobileNavOpen(false)}
             />
             <motion.aside
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "tween", duration: 0.2 }}
-              className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-brand-900 text-brand-100 md:hidden"
+              transition={{ type: "tween", duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-gradient-to-b from-navy-900 via-navy-800 to-brand-900 text-brand-100 shadow-glass md:hidden"
             >
               {sidebarContent}
             </motion.aside>
@@ -124,8 +145,8 @@ export function AppLayout() {
         )}
       </AnimatePresence>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
+      <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
+        <header className="glass sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between border-b px-4 shadow-sm sm:px-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileNavOpen(true)}
@@ -134,22 +155,36 @@ export function AppLayout() {
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
-            <div className="text-sm text-slate-500">
-              <span className="hidden sm:inline">Signed in as </span>
-              <span className="font-medium text-slate-800">{user.name}</span>
+            <div className="hidden text-sm text-slate-500 sm:block">
+              Signed in as <span className="font-medium text-slate-800">{user.name}</span>
             </div>
           </div>
-          <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">{roleLabel}</span>
+
+          <div className="flex items-center gap-3">
+            <button
+              aria-label="Notifications"
+              className="relative grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/70 text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <BellIcon className="h-[17px] w-[17px]" />
+              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-coral-500 shadow-[0_0_0_2px_white]" />
+            </button>
+            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-100">
+              {roleLabel}
+            </span>
+            <div className="hidden h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm sm:grid">
+              {initialsOf(user.name)}
+            </div>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-7">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
             >
               <Outlet />
             </motion.div>

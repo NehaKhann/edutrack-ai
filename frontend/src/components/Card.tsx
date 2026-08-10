@@ -9,8 +9,9 @@ export function Card({
   return (
     <div
       className={clsx(
-        "rounded-xl border border-slate-200 bg-white shadow-card transition-all duration-150",
-        interactive && "cursor-pointer hover:-translate-y-0.5 hover:shadow-md",
+        "animate-fade-up rounded-2xl border border-slate-200/70 bg-white/90 shadow-card backdrop-blur-sm transition-all duration-200",
+        interactive && "cursor-pointer hover:-translate-y-1 hover:border-brand-200 hover:shadow-glow-brand",
+        !interactive && "hover:shadow-glass",
         className
       )}
       {...rest}

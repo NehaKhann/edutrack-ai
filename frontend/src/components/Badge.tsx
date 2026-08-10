@@ -4,12 +4,12 @@ import type { ReactNode } from "react";
 type Tone = "green" | "blue" | "red" | "amber" | "gray" | "indigo";
 
 const toneClasses: Record<Tone, string> = {
-  green: "bg-green-100 text-green-800",
-  blue: "bg-blue-100 text-blue-800",
-  red: "bg-red-100 text-red-800",
-  amber: "bg-amber-100 text-amber-800",
+  green: "bg-teal-50 text-teal-700 ring-1 ring-inset ring-teal-100",
+  blue: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100",
+  red: "bg-coral-50 text-coral-700 ring-1 ring-inset ring-coral-100",
+  amber: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-100",
   gray: "bg-slate-100 text-slate-700",
-  indigo: "bg-indigo-100 text-indigo-800",
+  indigo: "bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-100",
 };
 
 export function Badge({ tone = "gray", children }: { tone?: Tone; children: ReactNode }) {

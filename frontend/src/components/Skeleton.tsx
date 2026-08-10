@@ -1,14 +1,14 @@
 import clsx from "clsx";
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={clsx("animate-pulse rounded-md bg-slate-200", className)} />;
+  return <div className={clsx("shimmer rounded-md", className)} />;
 }
 
 export function SkeletonCardGrid({ count = 3 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+        <div key={i} className="rounded-2xl border border-slate-200/70 bg-white/90 p-5 shadow-card">
           <div className="flex items-center gap-3">
             <Skeleton className="h-12 w-12 rounded-full" />
             <div className="flex-1 space-y-2">
