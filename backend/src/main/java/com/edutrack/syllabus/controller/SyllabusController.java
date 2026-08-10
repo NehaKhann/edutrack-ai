@@ -8,6 +8,7 @@ import com.edutrack.syllabus.dto.SyllabusResponse;
 import com.edutrack.syllabus.dto.SyllabusUploadResult;
 import com.edutrack.syllabus.dto.TopicResponse;
 import com.edutrack.syllabus.dto.UpdateDocumentTextRequest;
+import com.edutrack.syllabus.dto.UpdateSyllabusRequest;
 import com.edutrack.syllabus.entity.Syllabus;
 import com.edutrack.syllabus.service.SyllabusService;
 import com.edutrack.syllabus.service.TopicExtractionService;
@@ -36,14 +37,21 @@ public class SyllabusController {
             @RequestParam String term,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate termStartDate,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
-            @RequestParam(required = false) String manualText
+            @RequestParam(required = false) String manualText,
+            @RequestParam(required = false) Long cloneFromSyllabusId
     ) {
-        return ApiResponse.ok(syllabusService.createSyllabusWithDocuments(subjectId, term, termStartDate, files, manualText));
+        return ApiResponse.ok(syllabusService.createSyllabusWithDocuments(
+                subjectId, term, termStartDate, files, manualText, cloneFromSyllabusId));
     }
 
     @GetMapping
     public ApiResponse<List<SyllabusResponse>> listForSubject(@RequestParam Long subjectId) {
         return ApiResponse.ok(syllabusService.listForSubject(subjectId));
+    }
+
+    @PutMapping("/{id}")
+    public ApiResponse<SyllabusResponse> updateMeta(@PathVariable Long id, @Valid @RequestBody UpdateSyllabusRequest request) {
+        return ApiResponse.ok(syllabusService.updateMeta(id, request.term(), request.termStartDate()));
     }
 
     @PostMapping(value = "/{id}/documents", consumes = "multipart/form-data")

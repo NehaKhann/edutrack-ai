@@ -9,6 +9,7 @@ public record CoverageGridRow(
         String teacherName,
         long plannedToDateCount,
         long coveredCount,
-        String status
+        String status,
+        Integer daysBehind
 ) {
 }

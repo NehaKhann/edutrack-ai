@@ -11,6 +11,7 @@ import {
   AcademicCapIcon,
   UserCircleIcon,
   UsersIcon,
+  MagnifyingGlassIcon,
   Bars3Icon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -19,6 +20,7 @@ import { useAuth } from "../auth/AuthContext";
 const teacherNav = [
   { to: "/teacher/lesson-plan", label: "Today's Plan", icon: CalendarDaysIcon },
   { to: "/teacher/syllabus", label: "Syllabus", icon: BookOpenIcon },
+  { to: "/search", label: "Search", icon: MagnifyingGlassIcon },
   { to: "/teacher/profile", label: "My Profile", icon: UserCircleIcon },
   { to: "/calendar", label: "Calendar", icon: CalendarIcon },
 ];
@@ -26,6 +28,7 @@ const teacherNav = [
 const principalNav = [
   { to: "/principal/coverage", label: "Coverage Grid", icon: Squares2X2Icon },
   { to: "/principal/teachers", label: "Teacher Directory", icon: UsersIcon },
+  { to: "/search", label: "Search", icon: MagnifyingGlassIcon },
   { to: "/calendar", label: "Calendar", icon: CalendarIcon },
 ];
 

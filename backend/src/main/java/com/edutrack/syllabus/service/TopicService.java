@@ -1,7 +1,12 @@
 package com.edutrack.syllabus.service;
 
 import com.edutrack.common.ApiException;
+import com.edutrack.org.entity.Role;
+import com.edutrack.security.AuthenticatedUser;
+import com.edutrack.security.CurrentUser;
+import com.edutrack.syllabus.dto.ShiftTopicDatesResult;
 import com.edutrack.syllabus.dto.TopicResponse;
+import com.edutrack.syllabus.dto.TopicSearchResult;
 import com.edutrack.syllabus.dto.TopicUpsertRequest;
 import com.edutrack.syllabus.entity.Syllabus;
 import com.edutrack.syllabus.entity.Topic;
@@ -10,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -67,6 +73,39 @@ public class TopicService {
         return topicRepository.saveAll(topics).stream()
                 .sorted((a, b) -> a.getOrderIndex().compareTo(b.getOrderIndex()))
                 .map(TopicResponse::from).toList();
+    }
+
+    @Transactional
+    public ShiftTopicDatesResult shiftDates(Long syllabusId, int days) {
+        syllabusService.getOwned(syllabusId);
+        List<Topic> topics = topicRepository.findBySyllabusIdOrderByOrderIndexAsc(syllabusId);
+        for (Topic topic : topics) {
+            topic.setPlannedStartDate(topic.getPlannedStartDate().plusDays(days));
+            topic.setPlannedEndDate(topic.getPlannedEndDate().plusDays(days));
+        }
+        topicRepository.saveAll(topics);
+        return new ShiftTopicDatesResult(topics.size());
+    }
+
+    private static final int MAX_SEARCH_RESULTS = 50;
+
+    @Transactional(readOnly = true)
+    public List<TopicSearchResult> search(String query) {
+        if (query == null || query.trim().length() < 2) {
+            return List.of();
+        }
+        String needle = query.trim().toLowerCase();
+        AuthenticatedUser user = CurrentUser.get();
+        List<Topic> candidates = user.getRole() == Role.TEACHER
+                ? topicRepository.findBySyllabusSubjectTeacherId(user.getUserId())
+                : topicRepository.findBySyllabusSubjectClassSectionSchoolId(user.getSchoolId());
+
+        return candidates.stream()
+                .filter(t -> t.getTitle().toLowerCase().contains(needle))
+                .sorted(Comparator.comparing(Topic::getPlannedStartDate).reversed())
+                .limit(MAX_SEARCH_RESULTS)
+                .map(TopicSearchResult::from)
+                .toList();
     }
 
     private Topic getOwned(Long topicId) {

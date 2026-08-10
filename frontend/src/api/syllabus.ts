@@ -18,12 +18,14 @@ export function createSyllabus(params: {
   termStartDate: string;
   files: File[];
   manualText?: string;
+  cloneFromSyllabusId?: number;
   onProgress?: (pct: number) => void;
 }): Promise<SyllabusUploadResult> {
   const form = filesFormData(params.files, params.manualText);
   form.append("subjectId", String(params.subjectId));
   form.append("term", params.term);
   form.append("termStartDate", params.termStartDate);
+  if (params.cloneFromSyllabusId) form.append("cloneFromSyllabusId", String(params.cloneFromSyllabusId));
   return unwrap(
     apiClient.post("/api/syllabus", form, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -32,6 +34,14 @@ export function createSyllabus(params: {
       },
     })
   );
+}
+
+export function updateSyllabus(syllabusId: number, term: string, termStartDate: string): Promise<SyllabusDto> {
+  return unwrap(apiClient.put(`/api/syllabus/${syllabusId}`, { term, termStartDate }));
+}
+
+export function shiftTopicDates(syllabusId: number, days: number): Promise<{ shiftedCount: number }> {
+  return unwrap(apiClient.post(`/api/syllabus/${syllabusId}/topics/shift`, { days }));
 }
 
 export function addDocuments(

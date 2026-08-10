@@ -5,6 +5,7 @@ import {
   ArrowDownIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  ArrowsRightLeftIcon,
   PencilSquareIcon,
   TrashIcon,
   SparklesIcon,
@@ -20,7 +21,8 @@ import { PageHeader } from "../../components/PageHeader";
 import { SubjectSelect } from "../../components/SubjectSelect";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
-import { Field, TextInput } from "../../components/FormFields";
+import { Field, Select, TextInput } from "../../components/FormFields";
+import { Modal } from "../../components/Modal";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
@@ -176,6 +178,7 @@ export function SyllabusPage() {
               {creatingNew ? (
                 <NewSyllabusForm
                   subjectId={subjectId}
+                  existingSyllabi={syllabi}
                   onCreated={(id) => refreshSyllabi(id)}
                   onCancel={() => setCreatingNew(false)}
                 />
@@ -219,10 +222,12 @@ function MultiFileDropzone({ onFilesSelected }: { onFilesSelected: (files: File[
 
 function NewSyllabusForm({
   subjectId,
+  existingSyllabi,
   onCreated,
   onCancel,
 }: {
   subjectId: number | null;
+  existingSyllabi: SyllabusDto[];
   onCreated: (syllabusId: number) => void;
   onCancel: () => void;
 }) {
@@ -231,6 +236,7 @@ function NewSyllabusForm({
   const [files, setFiles] = useState<File[]>([]);
   const [showManual, setShowManual] = useState(false);
   const [manualText, setManualText] = useState("");
+  const [cloneFromId, setCloneFromId] = useState<number | "">("");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -253,8 +259,10 @@ function NewSyllabusForm({
     setFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
+  const hasContent = files.length > 0 || !!manualText.trim() || !!cloneFromId;
+
   async function handleSubmit() {
-    if (!subjectId || (files.length === 0 && !manualText.trim())) return;
+    if (!subjectId || !hasContent) return;
     setUploading(true);
     setProgress(0);
     setError(null);
@@ -265,6 +273,7 @@ function NewSyllabusForm({
         termStartDate,
         files,
         manualText,
+        cloneFromSyllabusId: cloneFromId ? Number(cloneFromId) : undefined,
         onProgress: setProgress,
       });
       if (result.failedFiles.length > 0) {
@@ -294,6 +303,26 @@ function NewSyllabusForm({
         <Field label="Term start date" hint="Used to map Week 1, Week 2... to real calendar dates">
           <TextInput type="date" value={termStartDate} onChange={(e) => setTermStartDate(e.target.value)} />
         </Field>
+
+        {existingSyllabi.length > 0 && (
+          <Field
+            label="Clone topics from a previous term (optional)"
+            hint="Copies that term's topics into this draft, with dates shifted to match the new start date above."
+          >
+            <Select
+              value={cloneFromId}
+              onChange={(e) => setCloneFromId(e.target.value ? Number(e.target.value) : "")}
+            >
+              <option value="">Don't clone — start from scratch</option>
+              {existingSyllabi.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.term}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+
         <Field label="Syllabus files" hint="PDF, Word (.doc/.docx), or a photo/scan (JPG, PNG, WebP) — one or more">
           <MultiFileDropzone onFilesSelected={addFiles} />
         </Field>
@@ -337,11 +366,13 @@ function NewSyllabusForm({
           </div>
         )}
 
-        <Button className="w-full" onClick={handleSubmit} loading={uploading} disabled={files.length === 0 && !manualText.trim()}>
+        <Button className="w-full" onClick={handleSubmit} loading={uploading} disabled={!hasContent}>
           {uploading
             ? `Uploading ${progress}%`
             : files.length > 0
             ? `Upload ${files.length} file(s)`
+            : cloneFromId
+            ? "Create syllabus (clone topics)"
             : "Create syllabus"}
         </Button>
       </CardBody>
@@ -365,6 +396,8 @@ function SyllabusWorkspace({
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
+  const [editingTerm, setEditingTerm] = useState(false);
+  const [savingTerm, setSavingTerm] = useState(false);
 
   useEffect(() => {
     setDocsLoading(true);
@@ -416,8 +449,48 @@ function SyllabusWorkspace({
     }
   }
 
+  async function handleSaveTerm(newTerm: string, newStartDate: string) {
+    setSavingTerm(true);
+    setError(null);
+    try {
+      const updated = await syllabusApi.updateSyllabus(syllabus.id, newTerm, newStartDate);
+      onSyllabusChange(updated);
+      setEditingTerm(false);
+
+      const oldStart = new Date(syllabus.termStartDate).getTime();
+      const newStart = new Date(newStartDate).getTime();
+      const deltaDays = Math.round((newStart - oldStart) / 86_400_000);
+      if (deltaDays !== 0 && topics.length > 0) {
+        const shift = confirm(
+          `Term start date changed by ${deltaDays > 0 ? "+" : ""}${deltaDays} day(s). Shift all ${topics.length} topic date(s) by the same amount to match?`
+        );
+        if (shift) {
+          await syllabusApi.shiftTopicDates(syllabus.id, deltaDays);
+          setTopics(await syllabusApi.listTopics(syllabus.id));
+        }
+      }
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setSavingTerm(false);
+    }
+  }
+
   return (
     <div>
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-sm">
+          <span className="font-semibold text-slate-800">{syllabus.term}</span>
+          <span className="ml-2 text-xs text-slate-400">starts {syllabus.termStartDate}</span>
+        </div>
+        <button
+          onClick={() => setEditingTerm(true)}
+          className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-brand-600"
+        >
+          <PencilIcon className="h-3.5 w-3.5" /> Edit term
+        </button>
+      </div>
+
       <div className="mb-4 flex gap-1 border-b border-slate-200">
         <TabButton active={tab === "syllabus"} onClick={() => setTab("syllabus")}>
           Syllabus
@@ -426,6 +499,16 @@ function SyllabusWorkspace({
           Planning
         </TabButton>
       </div>
+
+      {editingTerm && (
+        <EditTermModal
+          initialTerm={syllabus.term}
+          initialStartDate={syllabus.termStartDate}
+          saving={savingTerm}
+          onCancel={() => setEditingTerm(false)}
+          onSave={handleSaveTerm}
+        />
+      )}
 
       {error && (
         <div className="mb-4">
@@ -442,6 +525,7 @@ function SyllabusWorkspace({
         <DocumentsPanel
           syllabus={syllabus}
           documents={documents}
+          hasTopics={topics.length > 0}
           loading={docsLoading}
           onDocumentsChange={setDocuments}
           onConfirm={handleConfirm}
@@ -459,6 +543,44 @@ function SyllabusWorkspace({
         />
       )}
     </div>
+  );
+}
+
+function EditTermModal({
+  initialTerm,
+  initialStartDate,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  initialTerm: string;
+  initialStartDate: string;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (term: string, startDate: string) => void;
+}) {
+  const [term, setTerm] = useState(initialTerm);
+  const [startDate, setStartDate] = useState(initialStartDate);
+
+  return (
+    <Modal open onClose={onCancel} title="Edit term" widthClass="max-w-sm">
+      <div className="space-y-3">
+        <Field label="Term">
+          <TextInput value={term} onChange={(e) => setTerm(e.target.value)} />
+        </Field>
+        <Field label="Term start date" hint="If you change this, you'll be offered a one-click shift for all topic dates too.">
+          <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </Field>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" size="sm" onClick={onCancel} disabled={saving}>
+            Cancel
+          </Button>
+          <Button size="sm" onClick={() => onSave(term, startDate)} loading={saving} disabled={!term.trim() || !startDate}>
+            Save
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -490,6 +612,7 @@ function TabButton({
 function DocumentsPanel({
   syllabus,
   documents,
+  hasTopics,
   loading,
   onDocumentsChange,
   onConfirm,
@@ -498,6 +621,7 @@ function DocumentsPanel({
 }: {
   syllabus: SyllabusDto;
   documents: SyllabusDocument[];
+  hasTopics: boolean;
   loading: boolean;
   onDocumentsChange: (docs: SyllabusDocument[]) => void;
   onConfirm: () => Promise<void>;
@@ -603,7 +727,14 @@ function DocumentsPanel({
       )}
 
       {documents.length === 0 ? (
-        <EmptyState title="No documents yet" description="Upload one or more files below to get started." />
+        <EmptyState
+          title="No documents yet"
+          description={
+            hasTopics
+              ? "This draft has cloned topics but no uploaded files yet — that's fine, you can confirm and plan directly, or add source files below."
+              : "Upload one or more files below to get started."
+          }
+        />
       ) : (
         documents.map((doc) => (
           <DocumentCard
@@ -648,7 +779,7 @@ function DocumentsPanel({
             </div>
           )}
 
-          <Button className="w-full" onClick={handleConfirmClick} loading={confirming} disabled={documents.length === 0}>
+          <Button className="w-full" onClick={handleConfirmClick} loading={confirming} disabled={documents.length === 0 && !hasTopics}>
             Confirm Syllabus
           </Button>
         </>
@@ -867,6 +998,25 @@ function TopicsPanel({
   onError: (e: unknown) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [shifting, setShifting] = useState(false);
+  const [shiftDays, setShiftDays] = useState("");
+  const [applyingShift, setApplyingShift] = useState(false);
+
+  async function handleApplyShift() {
+    const days = parseInt(shiftDays, 10);
+    if (!days || Number.isNaN(days)) return;
+    setApplyingShift(true);
+    try {
+      await syllabusApi.shiftTopicDates(syllabus.id, days);
+      onTopicsChange(await syllabusApi.listTopics(syllabus.id));
+      setShifting(false);
+      setShiftDays("");
+    } catch (e) {
+      onError(e);
+    } finally {
+      setApplyingShift(false);
+    }
+  }
 
   async function handleDelete(topicId: number) {
     if (!confirm("Remove this topic? Any related lesson-plan history will also be removed.")) return;
@@ -921,6 +1071,11 @@ function TopicsPanel({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {topics.length > 0 && (
+            <Button size="sm" variant="secondary" onClick={() => setShifting((v) => !v)}>
+              <ArrowsRightLeftIcon className="h-4 w-4" /> Shift dates
+            </Button>
+          )}
           <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
             <PlusIcon className="h-4 w-4" /> Add topic
           </Button>
@@ -929,6 +1084,25 @@ function TopicsPanel({
           </Button>
         </div>
       </CardHeader>
+      {shifting && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+          <span className="text-xs text-slate-500">Shift every topic's dates by</span>
+          <TextInput
+            type="number"
+            value={shiftDays}
+            onChange={(e) => setShiftDays(e.target.value)}
+            className="w-20"
+            placeholder="e.g. 7"
+          />
+          <span className="text-xs text-slate-500">day(s) (negative to pull earlier)</span>
+          <Button size="sm" onClick={handleApplyShift} loading={applyingShift} disabled={!shiftDays}>
+            Apply
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setShifting(false)}>
+            Cancel
+          </Button>
+        </div>
+      )}
       <CardBody>
         {topics.length === 0 && !adding ? (
           <EmptyState

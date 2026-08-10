@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -58,11 +60,21 @@ public class CoverageService {
             status = "BEHIND";
         }
 
+        Integer daysBehind = null;
+        if ("BEHIND".equals(status)) {
+            daysBehind = topics.stream()
+                    .filter(t -> !t.isCovered() && !t.getPlannedStartDate().isAfter(today))
+                    .map(Topic::getPlannedStartDate)
+                    .min(Comparator.naturalOrder())
+                    .map(oldest -> (int) ChronoUnit.DAYS.between(oldest, today))
+                    .orElse(null);
+        }
+
         return new CoverageGridRow(
                 subject.getClassSection().getId(), subject.getClassSection().getName(),
                 subject.getId(), subject.getName(),
                 subject.getTeacher().getId(), subject.getTeacher().getName(),
-                plannedToDate, covered, status
+                plannedToDate, covered, status, daysBehind
         );
     }
 

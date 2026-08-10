@@ -15,6 +15,7 @@ import com.edutrack.syllabus.dto.SyllabusResponse;
 import com.edutrack.syllabus.dto.SyllabusUploadResult;
 import com.edutrack.syllabus.entity.Syllabus;
 import com.edutrack.syllabus.entity.SyllabusDocument;
+import com.edutrack.syllabus.entity.Topic;
 import com.edutrack.syllabus.repository.SyllabusDocumentRepository;
 import com.edutrack.syllabus.repository.SyllabusRepository;
 import com.edutrack.syllabus.repository.TopicRepository;
@@ -53,13 +54,26 @@ public class SyllabusService {
 
     @Transactional
     public SyllabusUploadResult createSyllabusWithDocuments(
-            Long subjectId, String term, LocalDate termStartDate, List<MultipartFile> files, String manualText) {
+            Long subjectId, String term, LocalDate termStartDate, List<MultipartFile> files, String manualText,
+            Long cloneFromSyllabusId) {
         Subject subject = subjectRepository.findById(subjectId)
                 .orElseThrow(() -> ApiException.notFound("Subject not found"));
         assertOwnsSubject(subject);
-        requireAtLeastOneFileOrText(files, manualText);
+
+        Syllabus sourceSyllabus = null;
+        if (cloneFromSyllabusId != null) {
+            sourceSyllabus = syllabusRepository.findById(cloneFromSyllabusId)
+                    .orElseThrow(() -> ApiException.notFound("Syllabus to clone from not found"));
+            if (!sourceSyllabus.getSubject().getId().equals(subjectId)) {
+                throw ApiException.badRequest("Can only clone topics from a syllabus of the same subject");
+            }
+        }
+        requireAtLeastOneFileOrText(files, manualText, sourceSyllabus != null);
 
         Syllabus syllabus = syllabusRepository.save(new Syllabus(subject, term, termStartDate));
+        if (sourceSyllabus != null) {
+            cloneTopics(sourceSyllabus, syllabus);
+        }
         return processFiles(syllabus, files, manualText);
     }
 
@@ -67,16 +81,27 @@ public class SyllabusService {
     public SyllabusUploadResult addDocuments(Long syllabusId, List<MultipartFile> files, String manualText) {
         Syllabus syllabus = getOwned(syllabusId);
         assertNotConfirmed(syllabus, "adding more files");
-        requireAtLeastOneFileOrText(files, manualText);
+        requireAtLeastOneFileOrText(files, manualText, false);
         return processFiles(syllabus, files, manualText);
     }
 
-    private void requireAtLeastOneFileOrText(List<MultipartFile> files, String manualText) {
+    private void requireAtLeastOneFileOrText(List<MultipartFile> files, String manualText, boolean hasAlternative) {
         boolean hasFiles = files != null && files.stream().anyMatch(f -> !f.isEmpty());
         boolean hasText = manualText != null && !manualText.isBlank();
-        if (!hasFiles && !hasText) {
-            throw ApiException.badRequest("Please choose at least one file, or type the syllabus text manually");
+        if (!hasFiles && !hasText && !hasAlternative) {
+            throw ApiException.badRequest("Please choose at least one file, type the syllabus text manually, or clone from a previous term");
         }
+    }
+
+    private void cloneTopics(Syllabus source, Syllabus target) {
+        long deltaDays = target.getTermStartDate().toEpochDay() - source.getTermStartDate().toEpochDay();
+        List<Topic> sourceTopics = topicRepository.findBySyllabusIdOrderByOrderIndexAsc(source.getId());
+        List<Topic> cloned = sourceTopics.stream().map(t -> new Topic(
+                target, t.getTitle(), t.getStartWeek(), t.getEndWeek(),
+                t.getPlannedStartDate().plusDays(deltaDays), t.getPlannedEndDate().plusDays(deltaDays),
+                t.getOrderIndex()
+        )).toList();
+        topicRepository.saveAll(cloned);
     }
 
     private SyllabusUploadResult processFiles(Syllabus syllabus, List<MultipartFile> files, String manualText) {
@@ -216,7 +241,8 @@ public class SyllabusService {
     @Transactional
     public SyllabusResponse confirm(Long syllabusId) {
         Syllabus syllabus = getOwned(syllabusId);
-        if (syllabusDocumentRepository.countBySyllabusId(syllabusId) == 0) {
+        boolean hasDocuments = syllabusDocumentRepository.countBySyllabusId(syllabusId) > 0;
+        if (!hasDocuments && !hasTopics(syllabusId)) {
             throw ApiException.badRequest("Upload at least one document before confirming.");
         }
         syllabus.setConfirmed(true);
@@ -230,6 +256,15 @@ public class SyllabusService {
         Syllabus syllabus = getOwned(syllabusId);
         syllabus.setConfirmed(false);
         syllabus.setConfirmedAt(null);
+        syllabusRepository.save(syllabus);
+        return SyllabusResponse.from(syllabus, hasTopics(syllabusId));
+    }
+
+    @Transactional
+    public SyllabusResponse updateMeta(Long syllabusId, String term, LocalDate termStartDate) {
+        Syllabus syllabus = getOwned(syllabusId);
+        syllabus.setTerm(term);
+        syllabus.setTermStartDate(termStartDate);
         syllabusRepository.save(syllabus);
         return SyllabusResponse.from(syllabus, hasTopics(syllabusId));
     }

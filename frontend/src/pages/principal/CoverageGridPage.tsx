@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
@@ -14,6 +14,8 @@ import * as coverageApi from "../../api/coverage";
 import { errorMessage } from "../../api/client";
 import type { CoverageGridRow, SubjectCoverageDetail } from "../../types";
 
+const CHRONIC_THRESHOLD_DAYS = 14;
+
 export function CoverageGridPage() {
   const [rows, setRows] = useState<CoverageGridRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,9 @@ export function CoverageGridPage() {
   const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<SubjectCoverageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  const chronicRows = rows.filter((r) => (r.daysBehind ?? 0) >= CHRONIC_THRESHOLD_DAYS);
 
   useEffect(() => {
     coverageApi
@@ -71,6 +76,26 @@ export function CoverageGridPage() {
         </div>
       )}
 
+      {!bannerDismissed && chronicRows.length > 0 && (
+        <div className="mb-4">
+          <Alert type="warning">
+            <div className="flex items-start justify-between gap-3">
+              <span>
+                <strong>{chronicRows.length}</strong> subject{chronicRows.length > 1 ? "s" : ""} {chronicRows.length > 1 ? "have" : "has"} been
+                behind schedule for {CHRONIC_THRESHOLD_DAYS}+ days:{" "}
+                {chronicRows.map((r) => `${r.subjectName} (${r.classSectionName})`).join(", ")}.
+              </span>
+              <button
+                onClick={() => setBannerDismissed(true)}
+                className="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-900"
+              >
+                Dismiss
+              </button>
+            </div>
+          </Alert>
+        </div>
+      )}
+
       {loading ? (
         <SkeletonRows count={4} />
       ) : rows.length === 0 ? (
@@ -102,7 +127,17 @@ export function CoverageGridPage() {
                     <td className="px-5 py-3 text-slate-600">{row.plannedToDateCount}</td>
                     <td className="px-5 py-3 text-slate-600">{row.coveredCount}</td>
                     <td className="px-5 py-3">
-                      <StatusBadge status={row.status} />
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={row.status} />
+                        {row.daysBehind != null && row.daysBehind >= CHRONIC_THRESHOLD_DAYS && (
+                          <span
+                            className="flex items-center gap-1 text-[11px] font-semibold text-red-600"
+                            title={`Behind schedule for ${row.daysBehind} days`}
+                          >
+                            <ExclamationTriangleIcon className="h-3.5 w-3.5" /> {row.daysBehind}d
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

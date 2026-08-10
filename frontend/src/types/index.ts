@@ -95,6 +95,20 @@ export interface CoverageGridRow {
   plannedToDateCount: number;
   coveredCount: number;
   status: CoverageStatus;
+  daysBehind: number | null;
+}
+
+export interface TopicSearchResult {
+  topicId: number;
+  title: string;
+  plannedStartDate: string;
+  plannedEndDate: string;
+  covered: boolean;
+  subjectId: number;
+  subjectName: string;
+  classSectionName: string;
+  syllabusId: number;
+  syllabusTerm: string;
 }
 
 export interface SubjectCoverageDetail {

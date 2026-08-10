@@ -2,7 +2,10 @@ package com.edutrack.syllabus.controller;
 
 import com.edutrack.common.ApiResponse;
 import com.edutrack.syllabus.dto.ReorderTopicsRequest;
+import com.edutrack.syllabus.dto.ShiftTopicDatesRequest;
+import com.edutrack.syllabus.dto.ShiftTopicDatesResult;
 import com.edutrack.syllabus.dto.TopicResponse;
+import com.edutrack.syllabus.dto.TopicSearchResult;
 import com.edutrack.syllabus.dto.TopicUpsertRequest;
 import com.edutrack.syllabus.service.TopicService;
 import jakarta.validation.Valid;
@@ -41,5 +44,15 @@ public class TopicController {
     @PostMapping("/api/syllabus/{syllabusId}/topics/reorder")
     public ApiResponse<List<TopicResponse>> reorder(@PathVariable Long syllabusId, @Valid @RequestBody ReorderTopicsRequest request) {
         return ApiResponse.ok(topicService.reorder(syllabusId, request.topicIdsInOrder()));
+    }
+
+    @PostMapping("/api/syllabus/{syllabusId}/topics/shift")
+    public ApiResponse<ShiftTopicDatesResult> shiftDates(@PathVariable Long syllabusId, @Valid @RequestBody ShiftTopicDatesRequest request) {
+        return ApiResponse.ok(topicService.shiftDates(syllabusId, request.days()));
+    }
+
+    @GetMapping("/api/topics/search")
+    public ApiResponse<List<TopicSearchResult>> search(@RequestParam String q) {
+        return ApiResponse.ok(topicService.search(q));
     }
 }

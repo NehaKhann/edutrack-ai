@@ -8,6 +8,7 @@ import { ProfilePage } from "./pages/teacher/ProfilePage";
 import { CoverageGridPage } from "./pages/principal/CoverageGridPage";
 import { TeacherDirectoryPage } from "./pages/principal/TeacherDirectoryPage";
 import { CalendarPage } from "./pages/CalendarPage";
+import { SearchPage } from "./pages/SearchPage";
 import { useAuth } from "./auth/AuthContext";
 import { FullPageSpinner } from "./components/Spinner";
 
@@ -29,6 +30,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/search" element={<SearchPage />} />
 
           <Route element={<ProtectedRoute allow={["TEACHER"]} />}>
             <Route path="/teacher/syllabus" element={<SyllabusPage />} />
