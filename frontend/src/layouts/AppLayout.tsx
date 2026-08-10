@@ -18,6 +18,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../auth/AuthContext";
 import { AmbientBackground } from "../components/AmbientBackground";
+import { ThemeToggle } from "../components/ThemeToggle";
 
 const teacherNav = [
   { to: "/teacher/lesson-plan", label: "Today's Plan", icon: CalendarDaysIcon },
@@ -86,7 +87,7 @@ export function AppLayout() {
                 "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
                 isActive
                   ? "bg-gradient-to-r from-brand-600/90 to-brand-500/70 text-white shadow-glow-brand"
-                  : "text-brand-200 hover:translate-x-0.5 hover:bg-white/8 hover:text-white"
+                  : "text-brand-200 hover:translate-x-0.5 hover:bg-white/[0.08] hover:text-white"
               )
             }
           >
@@ -99,7 +100,7 @@ export function AppLayout() {
       <div className="border-t border-white/10 px-3 py-3">
         <button
           onClick={logout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-brand-200 transition-colors hover:bg-white/8 hover:text-white"
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-brand-200 transition-colors hover:bg-white/[0.08] hover:text-white"
         >
           <ArrowRightStartOnRectangleIcon className="h-5 w-5" />
           Sign out
@@ -146,29 +147,30 @@ export function AppLayout() {
       </AnimatePresence>
 
       <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
-        <header className="glass sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between border-b px-4 shadow-sm sm:px-6">
+        <header className="glass sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-200/70 px-4 shadow-sm dark:border-white/10 sm:px-6">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileNavOpen(true)}
               aria-label="Open menu"
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 md:hidden"
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/[0.08] md:hidden"
             >
               <Bars3Icon className="h-6 w-6" />
             </button>
-            <div className="hidden text-sm text-slate-500 sm:block">
-              Signed in as <span className="font-medium text-slate-800">{user.name}</span>
+            <div className="hidden text-sm text-slate-500 dark:text-slate-400 sm:block">
+              Signed in as <span className="font-medium text-slate-800 dark:text-slate-100">{user.name}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <button
               aria-label="Notifications"
-              className="relative grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/70 text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              className="relative grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/70 text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
             >
               <BellIcon className="h-[17px] w-[17px]" />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-coral-500 shadow-[0_0_0_2px_white]" />
+              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-coral-500 shadow-[0_0_0_2px_white] dark:shadow-[0_0_0_2px_#0B1230]" />
             </button>
-            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-100">
+            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20">
               {roleLabel}
             </span>
             <div className="hidden h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm sm:grid">

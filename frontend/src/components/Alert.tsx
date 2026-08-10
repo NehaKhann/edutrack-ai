@@ -5,9 +5,9 @@ import { ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/so
 type AlertType = "error" | "success" | "warning";
 
 const toneClasses: Record<AlertType, string> = {
-  error: "border-coral-100 bg-coral-50 text-coral-700",
-  success: "border-teal-100 bg-teal-50 text-teal-700",
-  warning: "border-amber-200 bg-amber-50 text-amber-800",
+  error: "border-coral-100 bg-coral-50 text-coral-700 dark:border-coral-500/20 dark:bg-coral-500/10 dark:text-coral-300",
+  success: "border-teal-100 bg-teal-50 text-teal-700 dark:border-teal-500/20 dark:bg-teal-500/10 dark:text-teal-300",
+  warning: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300",
 };
 
 export function Alert({ type = "error", children }: { type?: AlertType; children: ReactNode }) {

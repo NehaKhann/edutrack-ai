@@ -228,15 +228,15 @@ function LessonPlanCard({
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-slate-900">{entry.topicTitle}</h3>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{entry.topicTitle}</h3>
               {entry.status === "RESCHEDULED" && <StatusBadge status="RESCHEDULED" />}
             </div>
-            <p className="text-xs text-slate-500">{entry.subjectName}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{entry.subjectName}</p>
           </div>
           {!isOpen && <StatusBadge status={entry.status} />}
         </div>
 
-        {entry.reason && <p className="mt-2 text-xs text-slate-500">Reason: {entry.reason}</p>}
+        {entry.reason && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Reason: {entry.reason}</p>}
 
         {isOpen && (
           <div className="mt-3">
@@ -250,7 +250,7 @@ function LessonPlanCard({
                 </Button>
               </div>
             ) : (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 dark:bg-white/5">
                 <Select value={reason} onChange={(e) => setReason(e.target.value)} className="max-w-xs">
                   {MISS_REASONS.map((r) => (
                     <option key={r} value={r}>

@@ -26,6 +26,8 @@ import { Modal } from "../../components/Modal";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
+import { DateRangeChip } from "../../components/DateRangeChip";
+import { formatDate } from "../../utils/date";
 import { getMySubjects } from "../../api/subjects";
 import * as syllabusApi from "../../api/syllabus";
 import { errorMessage } from "../../api/client";
@@ -140,7 +142,7 @@ export function SyllabusPage() {
               {syllabi.length > 0 && (
                 <Card>
                   <CardHeader>
-                    <h3 className="text-sm font-semibold text-slate-800">Syllabus versions</h3>
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Syllabus versions</h3>
                   </CardHeader>
                   <CardBody className="space-y-1">
                     {syllabi.map((s) => (
@@ -153,16 +155,16 @@ export function SyllabusPage() {
                         className={clsx(
                           "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm",
                           !creatingNew && s.id === selectedSyllabusId
-                            ? "bg-brand-50 text-brand-800"
-                            : "text-slate-600 hover:bg-slate-50"
+                            ? "bg-brand-50 text-brand-800 dark:bg-brand-500/15 dark:text-brand-200"
+                            : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5"
                         )}
                       >
                         <span>{s.term}</span>
                         <span className="flex items-center gap-1">
                           {s.confirmed ? (
-                            <CheckCircleIcon className="h-4 w-4 text-green-500" title="Confirmed" />
+                            <CheckCircleIcon className="h-4 w-4 text-teal-500" title="Confirmed" />
                           ) : (
-                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
                               Draft
                             </span>
                           )}
@@ -201,10 +203,10 @@ export function SyllabusPage() {
 
 function MultiFileDropzone({ onFilesSelected }: { onFilesSelected: (files: File[]) => void }) {
   return (
-    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center hover:border-brand-400 hover:bg-brand-50/40">
-      <CloudArrowUpIcon className="h-6 w-6 text-slate-400" />
-      <span className="text-sm text-slate-600">Click to choose file(s) — PDF, Word, or a photo/scan</span>
-      <span className="text-xs text-slate-400">You can select multiple files at once</span>
+    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center hover:border-brand-400 hover:bg-brand-50/40 dark:border-white/15 dark:bg-white/5 dark:hover:border-brand-400/60 dark:hover:bg-brand-500/10">
+      <CloudArrowUpIcon className="h-6 w-6 text-slate-400 dark:text-slate-500" />
+      <span className="text-sm text-slate-600 dark:text-slate-300">Click to choose file(s) — PDF, Word, or a photo/scan</span>
+      <span className="text-xs text-slate-400 dark:text-slate-500">You can select multiple files at once</span>
       <input
         type="file"
         multiple
@@ -290,8 +292,8 @@ function NewSyllabusForm({
   return (
     <Card>
       <CardHeader className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800">New syllabus</h3>
-        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600">
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">New syllabus</h3>
+        <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300">
           <XMarkIcon className="h-5 w-5" />
         </button>
       </CardHeader>
@@ -328,11 +330,11 @@ function NewSyllabusForm({
         </Field>
 
         {files.length > 0 && (
-          <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+          <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 dark:divide-white/[0.08] dark:border-white/10">
             {files.map((f, i) => (
-              <div key={i} className="flex items-center justify-between px-3 py-2 text-sm">
+              <div key={i} className="flex items-center justify-between px-3 py-2 text-sm text-slate-700 dark:text-slate-300">
                 <span className="truncate">{f.name}</span>
-                <button onClick={() => removeFile(i)} className="text-slate-400 hover:text-red-600">
+                <button onClick={() => removeFile(i)} className="text-slate-400 hover:text-coral-600 dark:text-slate-500 dark:hover:text-coral-400">
                   <XMarkIcon className="h-4 w-4" />
                 </button>
               </div>
@@ -355,14 +357,14 @@ function NewSyllabusForm({
               onChange={(e) => setManualText(e.target.value)}
               rows={8}
               placeholder="Type or paste the syllabus content here..."
-              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              className="block w-full rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-white/15 dark:bg-white/5 dark:text-slate-100"
             />
           </Field>
         )}
 
         {uploading && (
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+            <div className="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-400 transition-all" style={{ width: `${progress}%` }} />
           </div>
         )}
 
@@ -480,18 +482,18 @@ function SyllabusWorkspace({
     <div>
       <div className="mb-3 flex items-center justify-between">
         <div className="text-sm">
-          <span className="font-semibold text-slate-800">{syllabus.term}</span>
-          <span className="ml-2 text-xs text-slate-400">starts {syllabus.termStartDate}</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-100">{syllabus.term}</span>
+          <span className="ml-2 text-xs text-slate-400 dark:text-slate-500">starts {formatDate(syllabus.termStartDate)}</span>
         </div>
         <button
           onClick={() => setEditingTerm(true)}
-          className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-brand-600"
+          className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400"
         >
           <PencilIcon className="h-3.5 w-3.5" /> Edit term
         </button>
       </div>
 
-      <div className="mb-4 flex gap-1 border-b border-slate-200">
+      <div className="mb-4 flex gap-1 border-b border-slate-200 dark:border-white/10">
         <TabButton active={tab === "syllabus"} onClick={() => setTab("syllabus")}>
           Syllabus
         </TabButton>
@@ -600,7 +602,9 @@ function TabButton({
       onClick={onClick}
       className={clsx(
         "flex items-center gap-1.5 border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-        active ? "border-brand-600 text-brand-700" : "border-transparent text-slate-500 hover:text-slate-700"
+        active
+          ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
+          : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
       )}
     >
       {locked && <LockClosedIcon className="h-3.5 w-3.5" />}
@@ -713,9 +717,9 @@ function DocumentsPanel({
   return (
     <div className="space-y-4">
       {syllabus.confirmed && (
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border-teal-200 bg-teal-50 dark:border-teal-500/20 dark:bg-teal-500/10">
           <CardBody className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-sm font-medium text-green-800">
+            <span className="flex items-center gap-2 text-sm font-medium text-teal-800 dark:text-teal-300">
               <CheckCircleIcon className="h-5 w-5" />
               Confirmed{syllabus.confirmedAt ? ` on ${new Date(syllabus.confirmedAt).toLocaleDateString()}` : ""}
             </span>
@@ -755,18 +759,18 @@ function DocumentsPanel({
             <button
               type="button"
               onClick={() => setShowManual(true)}
-              className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700"
+              className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
             >
               <PencilIcon className="h-3.5 w-3.5" /> Or type it manually instead
             </button>
           ) : (
-            <div className="space-y-2 rounded-lg border border-slate-100 p-3">
+            <div className="space-y-2 rounded-lg border border-slate-100 p-3 dark:border-white/10">
               <textarea
                 value={manualText}
                 onChange={(e) => setManualText(e.target.value)}
                 rows={6}
                 placeholder="Type or paste syllabus content here..."
-                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                className="block w-full rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-white/15 dark:bg-white/5 dark:text-slate-100"
               />
               <div className="flex justify-end gap-2">
                 <Button variant="secondary" size="sm" onClick={() => { setShowManual(false); setManualText(""); }}>
@@ -791,13 +795,19 @@ function DocumentsPanel({
 function ConfidenceBadge({ confidence, isManual }: { confidence: number | null; isManual: boolean }) {
   if (isManual) {
     return (
-      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Typed text</span>
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-white/[0.08] dark:text-slate-400">
+        Typed text
+      </span>
     );
   }
   if (confidence == null) return null;
   const rounded = Math.round(confidence);
   const colorClass =
-    confidence >= 85 ? "bg-green-100 text-green-700" : confidence >= 65 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700";
+    confidence >= 85
+      ? "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300"
+      : confidence >= 65
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+      : "bg-coral-100 text-coral-700 dark:bg-coral-500/15 dark:text-coral-300";
   return <span className={clsx("rounded-full px-2 py-0.5 text-[11px] font-semibold", colorClass)}>{rounded}% confidence</span>;
 }
 
@@ -848,7 +858,7 @@ function DocumentPreviewPane({ documentId }: { documentId: number }) {
 
   if (loading) {
     return (
-      <div className="flex h-56 items-center justify-center rounded-lg bg-slate-50">
+      <div className="flex h-56 items-center justify-center rounded-lg bg-slate-50 dark:bg-white/5">
         <Spinner className="h-5 w-5" />
       </div>
     );
@@ -856,7 +866,7 @@ function DocumentPreviewPane({ documentId }: { documentId: number }) {
 
   if (!info || info.type === "NONE") {
     return (
-      <div className="flex h-56 items-center justify-center rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-400">
+      <div className="flex h-56 items-center justify-center rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-400 dark:bg-white/5 dark:text-slate-500">
         Preview not available for this file type — use the extracted text.
       </div>
     );
@@ -865,14 +875,18 @@ function DocumentPreviewPane({ documentId }: { documentId: number }) {
   return (
     <div className="flex flex-col items-center gap-2">
       {imgUrl ? (
-        <img src={imgUrl} alt="Original scan" className="max-h-72 w-full rounded-lg border border-slate-200 object-contain" />
+        <img
+          src={imgUrl}
+          alt="Original scan"
+          className="max-h-72 w-full rounded-lg border border-slate-200 object-contain dark:border-white/10"
+        />
       ) : (
-        <div className="flex h-56 w-full items-center justify-center rounded-lg bg-slate-50">
+        <div className="flex h-56 w-full items-center justify-center rounded-lg bg-slate-50 dark:bg-white/5">
           <Spinner className="h-5 w-5" />
         </div>
       )}
       {info.type === "PDF" && info.pageCount > 1 && (
-        <div className="flex items-center gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
           <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="disabled:opacity-30">
             <ArrowLeftIcon className="h-3.5 w-3.5" />
           </button>
@@ -917,13 +931,13 @@ function DocumentCard({
   return (
     <Card>
       <CardHeader className="flex items-center justify-between">
-        <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <DocumentIcon className="h-4 w-4 text-slate-400" />
+        <span className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+          <DocumentIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" />
           {document.originalFilename}
           <ConfidenceBadge confidence={document.ocrConfidence} isManual={isManual} />
         </span>
         {!readOnly && (
-          <button onClick={onDelete} className="text-slate-400 hover:text-red-600">
+          <button onClick={onDelete} className="text-slate-400 hover:text-coral-600 dark:text-slate-500 dark:hover:text-coral-400">
             <TrashIcon className="h-4 w-4" />
           </button>
         )}
@@ -931,9 +945,9 @@ function DocumentCard({
       <CardBody className="space-y-3">
         {document.lowConfidenceWords.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-medium text-slate-500">Check:</span>
+            <span className="font-medium text-slate-500 dark:text-slate-400">Check:</span>
             {document.lowConfidenceWords.map((w, i) => (
-              <span key={i} className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">
+              <span key={i} className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
                 {w}
               </span>
             ))}
@@ -955,7 +969,7 @@ function DocumentCard({
           <DocumentPreviewPane documentId={document.id} />
           <div>
             {readOnly ? (
-              <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700">
+              <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700 dark:bg-white/5 dark:text-slate-300">
                 {document.extractedText}
               </pre>
             ) : (
@@ -964,7 +978,7 @@ function DocumentCard({
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   rows={10}
-                  className="block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs leading-relaxed text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                  className="block w-full rounded-lg border border-slate-300 bg-white/80 px-3 py-2 font-mono text-xs leading-relaxed text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-white/15 dark:bg-white/5 dark:text-slate-100"
                 />
                 {dirty && (
                   <div className="mt-2 flex justify-end">
@@ -1065,8 +1079,8 @@ function TopicsPanel({
     <Card>
       <CardHeader className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800">{syllabus.term} &mdash; Topics</h3>
-          <p className="text-xs text-slate-500">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{syllabus.term} &mdash; Topics</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {topics.filter((t) => t.covered).length} of {topics.length} topics covered
           </p>
         </div>
@@ -1085,8 +1099,8 @@ function TopicsPanel({
         </div>
       </CardHeader>
       {shifting && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
-          <span className="text-xs text-slate-500">Shift every topic's dates by</span>
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+          <span className="text-xs text-slate-500 dark:text-slate-400">Shift every topic's dates by</span>
           <TextInput
             type="number"
             value={shiftDays}
@@ -1094,7 +1108,7 @@ function TopicsPanel({
             className="w-20"
             placeholder="e.g. 7"
           />
-          <span className="text-xs text-slate-500">day(s) (negative to pull earlier)</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400">day(s) (negative to pull earlier)</span>
           <Button size="sm" onClick={handleApplyShift} loading={applyingShift} disabled={!shiftDays}>
             Apply
           </Button>
@@ -1175,21 +1189,21 @@ function TopicRow({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-transparent px-2.5 py-3 transition-colors hover:border-slate-200/70 hover:bg-slate-50/70">
-      <div className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div className="flex items-start gap-3 rounded-xl border border-transparent px-2.5 py-3 transition-colors hover:border-slate-200/70 hover:bg-slate-50/70 dark:hover:border-white/10 dark:hover:bg-white/5">
+      <div className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5">
         <button
           disabled={index === 0}
           onClick={() => onMove(index, -1)}
-          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30"
+          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
           aria-label="Move up"
         >
           <ArrowUpIcon className="h-3.5 w-3.5" />
         </button>
-        <div className="h-px bg-slate-200" />
+        <div className="h-px bg-slate-200 dark:bg-white/10" />
         <button
           disabled={index === total - 1}
           onClick={() => onMove(index, 1)}
-          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30"
+          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
           aria-label="Move down"
         >
           <ArrowDownIcon className="h-3.5 w-3.5" />
@@ -1198,19 +1212,17 @@ function TopicRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold leading-snug text-navy-900">{topic.title}</span>
+          <span className="text-sm font-semibold leading-snug text-navy-900 dark:text-slate-100">{topic.title}</span>
           {topic.covered && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100">
+            <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20">
               <CheckCircleIcon className="h-3 w-3" /> Covered
             </span>
           )}
         </div>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-600">
-            {topic.plannedStartDate} &rarr; {topic.plannedEndDate}
-          </span>
+          <DateRangeChip start={topic.plannedStartDate} end={topic.plannedEndDate} />
           {topic.startWeek && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-brand-700">
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-medium tabular-nums text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
               Week {topic.startWeek}
               {topic.endWeek !== topic.startWeek ? `–${topic.endWeek}` : ""}
             </span>
@@ -1221,14 +1233,14 @@ function TopicRow({
       <div className="flex items-center gap-1">
         <button
           onClick={() => setEditing(true)}
-          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
           aria-label="Edit topic"
         >
           <PencilSquareIcon className="h-4 w-4" />
         </button>
         <button
           onClick={onDelete}
-          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-coral-50 hover:text-coral-600"
+          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-coral-50 hover:text-coral-600 dark:text-slate-500 dark:hover:bg-coral-500/15 dark:hover:text-coral-400"
           aria-label="Delete topic"
         >
           <TrashIcon className="h-4 w-4" />
@@ -1254,7 +1266,7 @@ function TopicForm({
   const [plannedEndDate, setPlannedEndDate] = useState(initial?.plannedEndDate ?? defaultStart ?? "");
 
   return (
-    <div className="grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/5 sm:grid-cols-4">
       <div className="sm:col-span-2">
         <Field label="Title">
           <TextInput value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Fractions" autoFocus />

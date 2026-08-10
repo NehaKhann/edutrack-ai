@@ -6,9 +6,22 @@ html, body, #root {
   height: 100%;
 }
 
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
 body {
-  @apply text-slate-900 antialiased;
+  @apply text-slate-900 antialiased transition-colors duration-300;
   background: #F5F6FC;
+}
+
+.dark body {
+  @apply text-slate-100;
+  background: #0B1230;
 }
 
 * {
@@ -23,6 +36,11 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.6);
   }
 
+  .dark .glass {
+    background: rgba(15, 23, 55, 0.66);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
   .glass-dark {
     background: rgba(15, 27, 76, 0.55);
     backdrop-filter: blur(16px);
@@ -34,6 +52,11 @@ body {
     background: linear-gradient(90deg, #E7E9F7 0%, #F3F0FF 20%, #E7E9F7 40%);
     background-size: 800px 100%;
     @apply animate-shimmer;
+  }
+
+  .dark .shimmer {
+    background: linear-gradient(90deg, #1B2360 0%, #262E7A 20%, #1B2360 40%);
+    background-size: 800px 100%;
   }
 }
 

@@ -99,8 +99,8 @@ function PhotoCard({
           refreshKey={photoVersion}
         />
         <div className="text-center">
-          <p className="text-base font-semibold text-slate-900">{profile.name}</p>
-          <p className="text-sm text-slate-500">{profile.designation || "No designation set"}</p>
+          <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{profile.name}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{profile.designation || "No designation set"}</p>
         </div>
 
         {localError && <Alert type="error">{localError}</Alert>}
@@ -113,7 +113,7 @@ function PhotoCard({
             className="hidden"
             onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           />
-          <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
+          <span className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-white/15 dark:bg-white/[0.08] dark:text-slate-200 dark:hover:bg-white/[0.12]">
             {uploading ? <Spinner className="h-4 w-4" /> : <CameraIcon className="h-4 w-4" />}
             {uploading ? `Uploading ${progress}%` : "Change photo"}
           </span>
@@ -127,17 +127,17 @@ function SubjectsCard({ profile }: { profile: TeacherProfile }) {
   return (
     <Card>
       <CardHeader>
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <BriefcaseIcon className="h-4 w-4 text-slate-400" /> Subjects & Classes
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+          <BriefcaseIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" /> Subjects & Classes
         </h3>
       </CardHeader>
       <CardBody className="space-y-2">
         {profile.subjects.length === 0 ? (
-          <p className="text-sm text-slate-400">No subjects assigned yet.</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">No subjects assigned yet.</p>
         ) : (
           profile.subjects.map((s) => (
-            <div key={s.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-              <span className="font-medium text-slate-700">{s.name}</span>
+            <div key={s.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm dark:bg-white/5">
+              <span className="font-medium text-slate-700 dark:text-slate-200">{s.name}</span>
               <Badge tone="indigo">{s.classSectionName}</Badge>
             </div>
           ))
@@ -179,7 +179,7 @@ function DetailsCard({
   return (
     <Card>
       <CardHeader>
-        <h3 className="text-sm font-semibold text-slate-800">About</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">About</h3>
       </CardHeader>
       <CardBody className="space-y-4">
         <Field label="Designation / Title">
@@ -195,14 +195,14 @@ function DetailsCard({
             onChange={(e) => setBio(e.target.value)}
             rows={4}
             placeholder="A short introduction — experience, teaching philosophy, achievements..."
-            className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            className="block w-full rounded-lg border border-slate-300 bg-white/80 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
         </Field>
         <div className="flex items-center gap-3">
           <Button onClick={handleSave} loading={saving}>
             Save changes
           </Button>
-          {saved && <span className="text-sm text-green-600">Saved</span>}
+          {saved && <span className="text-sm text-teal-600 dark:text-teal-400">Saved</span>}
         </div>
       </CardBody>
     </Card>
@@ -261,14 +261,14 @@ function TimetableCard({
   return (
     <Card>
       <CardHeader className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800">Timetable</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Timetable</h3>
         <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
           <PlusIcon className="h-4 w-4" /> Add slot
         </Button>
       </CardHeader>
       <CardBody className="space-y-2">
         {adding && (
-          <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 dark:bg-white/5 sm:grid-cols-4">
             <Field label="Day">
               <Select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value as DayOfWeek)}>
                 {DAYS_OF_WEEK.map((d) => (
@@ -306,19 +306,22 @@ function TimetableCard({
         )}
 
         {sorted.length === 0 && !adding ? (
-          <p className="py-4 text-sm text-slate-400">No timetable slots added yet.</p>
+          <p className="py-4 text-sm text-slate-400 dark:text-slate-500">No timetable slots added yet.</p>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-white/[0.08]">
             {sorted.map((slot) => (
               <div key={slot.id} className="flex items-center justify-between py-2.5 text-sm">
                 <div>
-                  <span className="font-medium text-slate-800">{DAY_LABELS[slot.dayOfWeek]}</span>
-                  <span className="ml-2 text-slate-500">
+                  <span className="font-medium text-slate-800 dark:text-slate-100">{DAY_LABELS[slot.dayOfWeek]}</span>
+                  <span className="ml-2 tabular-nums text-slate-500 dark:text-slate-400">
                     {slot.startTime.slice(0, 5)}–{slot.endTime.slice(0, 5)}
                   </span>
-                  {slot.subjectName && <span className="ml-2 text-slate-500">· {slot.subjectName}</span>}
+                  {slot.subjectName && <span className="ml-2 text-slate-500 dark:text-slate-400">· {slot.subjectName}</span>}
                 </div>
-                <button onClick={() => handleDelete(slot.id)} className="text-slate-400 hover:text-red-600">
+                <button
+                  onClick={() => handleDelete(slot.id)}
+                  className="text-slate-400 hover:text-coral-600 dark:text-slate-500 dark:hover:text-coral-400"
+                >
                   <TrashIcon className="h-4 w-4" />
                 </button>
               </div>

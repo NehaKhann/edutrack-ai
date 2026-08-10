@@ -7,6 +7,7 @@ import { Button } from "../components/Button";
 import { TextInput, Field } from "../components/FormFields";
 import { Alert } from "../components/Alert";
 import { AmbientBackground } from "../components/AmbientBackground";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { errorMessage } from "../api/client";
 
 export function LoginPage() {
@@ -70,7 +71,11 @@ export function LoginPage() {
         <p className="relative z-10 text-sm text-brand-200">&copy; {new Date().getFullYear()} EduTrack AI</p>
       </div>
 
-      <div className="relative flex w-full flex-col items-center justify-center px-6 lg:w-1/2" style={{ background: "#F5F6FC" }}>
+      <div className="relative flex w-full flex-col items-center justify-center bg-[#F5F6FC] px-6 dark:bg-navy-900 lg:w-1/2">
+        <div className="absolute right-5 top-5">
+          <ThemeToggle />
+        </div>
+
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -82,14 +87,17 @@ export function LoginPage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 shadow-glow-brand">
                 <AcademicCapIcon className="h-5 w-5 text-white" />
               </div>
-              <span className="font-display text-lg font-bold text-navy-900">EduTrack AI</span>
+              <span className="font-display text-lg font-bold text-navy-900 dark:text-white">EduTrack AI</span>
             </div>
           </div>
 
-          <h2 className="font-display text-2xl font-bold tracking-tight text-navy-900">Welcome back</h2>
-          <p className="mt-1 text-sm text-slate-500">Sign in to your teacher or principal account.</p>
+          <h2 className="font-display text-2xl font-bold tracking-tight text-navy-900 dark:text-white">Welcome back</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Sign in to your teacher or principal account.</p>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4 rounded-2xl border border-slate-200/70 bg-white/80 p-6 shadow-glass backdrop-blur-sm">
+          <form
+            onSubmit={handleSubmit}
+            className="mt-6 space-y-4 rounded-2xl border border-slate-200/70 bg-white/80 p-6 shadow-glass backdrop-blur-sm dark:border-white/10 dark:bg-white/5"
+          >
             {error && <Alert type="error">{error}</Alert>}
             <Field label="Email">
               <TextInput
@@ -115,8 +123,8 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/70 p-3 text-xs text-slate-500 backdrop-blur-sm">
-            <p className="font-semibold text-slate-700">Demo accounts (password: Password123!)</p>
+          <div className="mt-6 rounded-xl border border-slate-200/70 bg-white/70 p-3 text-xs text-slate-500 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
+            <p className="font-semibold text-slate-700 dark:text-slate-200">Demo accounts (password: Password123!)</p>
             <p className="mt-1">Principal: principal@edutrack.school</p>
             <p>Teacher: sana.tariq@edutrack.school</p>
           </div>

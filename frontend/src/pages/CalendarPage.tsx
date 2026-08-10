@@ -10,6 +10,7 @@ import { Spinner } from "../components/Spinner";
 import { useAuth } from "../auth/AuthContext";
 import * as calendarApi from "../api/calendar";
 import { errorMessage } from "../api/client";
+import { formatDate } from "../utils/date";
 import { DAYS_OF_WEEK, type DayOfWeek } from "../types/profile";
 import type { DayOverride, DayStatus, MonthView } from "../types/calendar";
 
@@ -151,20 +152,26 @@ export function CalendarPage() {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => goToMonth(-1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+            <button
+              onClick={() => goToMonth(-1)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.08]"
+            >
               <ChevronLeftIcon className="h-5 w-5" />
             </button>
-            <h3 className="w-40 text-center text-sm font-semibold text-slate-800">
+            <h3 className="w-40 text-center text-sm font-semibold text-slate-800 dark:text-slate-100">
               {MONTH_NAMES[month - 1]} {year}
             </h3>
-            <button onClick={() => goToMonth(1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">
+            <button
+              onClick={() => goToMonth(1)}
+              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.08]"
+            >
               <ChevronRightIcon className="h-5 w-5" />
             </button>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-500">
-            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-200" /> Weekend</span>
-            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /> Off</span>
-            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Extra working</span>
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-500" /> Weekend</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Off</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-teal-400" /> Extra working</span>
           </div>
         </CardHeader>
         <CardBody>
@@ -175,7 +182,7 @@ export function CalendarPage() {
           ) : (
             <div className="grid grid-cols-7 gap-1.5">
               {DAYS_OF_WEEK.map((d) => (
-                <div key={d} className="pb-1 text-center text-xs font-semibold uppercase text-slate-400">
+                <div key={d} className="pb-1 text-center text-xs font-semibold uppercase text-slate-400 dark:text-slate-500">
                   {DAY_SHORT[d]}
                 </div>
               ))}
@@ -185,17 +192,17 @@ export function CalendarPage() {
                 const override = overrideByIso.get(cell.iso);
                 const isToday = cell.iso === todayIso;
 
-                let cellClass = "border-slate-100 bg-white";
-                let labelClass = "text-slate-700";
+                let cellClass = "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5";
+                let labelClass = "text-slate-700 dark:text-slate-300";
                 if (override?.status === "OFF") {
-                  cellClass = "border-amber-300 bg-amber-50";
-                  labelClass = "text-amber-700";
+                  cellClass = "border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10";
+                  labelClass = "text-amber-700 dark:text-amber-300";
                 } else if (override?.status === "WORKING") {
-                  cellClass = "border-emerald-300 bg-emerald-50";
-                  labelClass = "text-emerald-700";
+                  cellClass = "border-teal-300 bg-teal-50 dark:border-teal-500/30 dark:bg-teal-500/10";
+                  labelClass = "text-teal-700 dark:text-teal-300";
                 } else if (isWeekend) {
-                  cellClass = "border-slate-200 bg-slate-100";
-                  labelClass = "text-slate-500";
+                  cellClass = "border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/[0.08]";
+                  labelClass = "text-slate-500 dark:text-slate-400";
                 }
 
                 return (
@@ -290,8 +297,12 @@ function DayModal({
   return (
     <Modal open onClose={onClose} title={formatLong(iso)} widthClass="max-w-md">
       <div className="space-y-4">
-        <p className="text-sm text-slate-500">
-          Normally a <span className="font-medium text-slate-700">{defaultStatus === "OFF" ? "weekend / off" : "working"}</span> day.
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Normally a{" "}
+          <span className="font-medium text-slate-700 dark:text-slate-200">
+            {defaultStatus === "OFF" ? "weekend / off" : "working"}
+          </span>{" "}
+          day.
         </p>
 
         <div className="flex gap-2">
@@ -299,7 +310,9 @@ function DayModal({
             type="button"
             onClick={() => setStatus("WORKING")}
             className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-              status === "WORKING" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+              status === "WORKING"
+                ? "border-teal-400 bg-teal-50 text-teal-700 dark:border-teal-500/40 dark:bg-teal-500/10 dark:text-teal-300"
+                : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
             }`}
           >
             Working day
@@ -308,7 +321,9 @@ function DayModal({
             type="button"
             onClick={() => setStatus("OFF")}
             className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-              status === "OFF" ? "border-amber-400 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+              status === "OFF"
+                ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+                : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
             }`}
           >
             Holiday / Off
@@ -320,13 +335,13 @@ function DayModal({
         </Field>
 
         {override && (
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-400 dark:text-slate-500">
             Last changed{override.changedByName ? ` by ${override.changedByName}` : ""}
             {override.changedAt ? ` on ${new Date(override.changedAt).toLocaleString()}` : ""}.
           </p>
         )}
 
-        <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+        <div className="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-white/10">
           {override ? (
             <Button variant="ghost" size="sm" onClick={handleReset} disabled={saving}>
               <ArrowPathIcon className="h-4 w-4" /> Reset to default
@@ -398,8 +413,8 @@ function BulkUpdateCard({
   return (
     <Card>
       <CardHeader>
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <BoltIcon className="h-4 w-4 text-slate-400" /> Bulk update
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+          <BoltIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" /> Bulk update
         </h3>
       </CardHeader>
       <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-5">
@@ -429,7 +444,7 @@ function BulkUpdateCard({
           <TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Summer break" />
         </Field>
         <div className="col-span-full flex items-center justify-between">
-          {result ? <p className="text-sm text-emerald-600">{result}</p> : <span />}
+          {result ? <p className="text-sm text-teal-600 dark:text-teal-400">{result}</p> : <span />}
           <Button size="sm" variant="secondary" onClick={handleApplyClick}>
             Apply
           </Button>
@@ -438,8 +453,9 @@ function BulkUpdateCard({
 
       <Modal open={confirmCount !== null} onClose={() => setConfirmCount(null)} title="Confirm bulk update" widthClass="max-w-sm">
         <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            This will mark <span className="font-semibold">{confirmCount}</span> day(s) between {startDate} and {endDate} as{" "}
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            This will mark <span className="font-semibold">{confirmCount}</span> day(s) between{" "}
+            <span className="font-medium">{formatDate(startDate)}</span> and <span className="font-medium">{formatDate(endDate)}</span> as{" "}
             <span className="font-semibold">{status === "OFF" ? "Off / Holiday" : "Working"}</span>. Continue?
           </p>
           <div className="flex justify-end gap-2">
@@ -490,7 +506,7 @@ function WeekendDaysCard({ onError }: { onError: (e: unknown) => void }) {
   return (
     <Card>
       <CardHeader>
-        <h3 className="text-sm font-semibold text-slate-800">Weekend days (default pattern)</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Weekend days (default pattern)</h3>
       </CardHeader>
       <CardBody className="flex flex-wrap gap-2">
         {DAYS_OF_WEEK.map((d) => {
@@ -501,7 +517,9 @@ function WeekendDaysCard({ onError }: { onError: (e: unknown) => void }) {
               disabled={saving}
               onClick={() => toggle(d)}
               className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
-                active ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                active
+                  ? "bg-gradient-to-br from-brand-600 to-brand-400 text-white shadow-glow-brand"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/[0.08] dark:text-slate-300 dark:hover:bg-white/[0.12]"
               }`}
             >
               {DAY_SHORT[d]}

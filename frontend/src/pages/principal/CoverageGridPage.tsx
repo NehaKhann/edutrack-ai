@@ -12,6 +12,7 @@ import { Modal } from "../../components/Modal";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
 import * as coverageApi from "../../api/coverage";
 import { errorMessage } from "../../api/client";
+import { formatDate } from "../../utils/date";
 import type { CoverageGridRow, SubjectCoverageDetail } from "../../types";
 
 const CHRONIC_THRESHOLD_DAYS = 14;
@@ -87,7 +88,7 @@ export function CoverageGridPage() {
               </span>
               <button
                 onClick={() => setBannerDismissed(true)}
-                className="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-900"
+                className="shrink-0 text-xs font-semibold text-amber-800 underline hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-200"
               >
                 Dismiss
               </button>
@@ -104,7 +105,7 @@ export function CoverageGridPage() {
         <Card className="overflow-hidden">
           <ResponsiveTable>
             <table className="w-full min-w-[640px] text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
                 <tr>
                   <th className="px-5 py-3">Class</th>
                   <th className="px-5 py-3">Subject</th>
@@ -114,24 +115,24 @@ export function CoverageGridPage() {
                   <th className="px-5 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-white/[0.08]">
                 {rows.map((row) => (
                   <tr
                     key={row.subjectId}
-                    className="cursor-pointer transition-colors hover:bg-slate-50"
+                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
                     onClick={() => openDetail(row.subjectId)}
                   >
-                    <td className="px-5 py-3 font-medium text-slate-800">{row.classSectionName}</td>
-                    <td className="px-5 py-3 text-slate-600">{row.subjectName}</td>
-                    <td className="px-5 py-3 text-slate-600">{row.teacherName}</td>
-                    <td className="px-5 py-3 text-slate-600">{row.plannedToDateCount}</td>
-                    <td className="px-5 py-3 text-slate-600">{row.coveredCount}</td>
+                    <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">{row.classSectionName}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{row.subjectName}</td>
+                    <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{row.teacherName}</td>
+                    <td className="px-5 py-3 tabular-nums text-slate-600 dark:text-slate-300">{row.plannedToDateCount}</td>
+                    <td className="px-5 py-3 tabular-nums text-slate-600 dark:text-slate-300">{row.coveredCount}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         <StatusBadge status={row.status} />
                         {row.daysBehind != null && row.daysBehind >= CHRONIC_THRESHOLD_DAYS && (
                           <span
-                            className="flex items-center gap-1 text-[11px] font-semibold text-red-600"
+                            className="flex items-center gap-1 text-[11px] font-semibold tabular-nums text-coral-600 dark:text-coral-400"
                             title={`Behind schedule for ${row.daysBehind} days`}
                           >
                             <ExclamationTriangleIcon className="h-3.5 w-3.5" /> {row.daysBehind}d
@@ -155,30 +156,32 @@ export function CoverageGridPage() {
         ) : (
           <div className="space-y-5">
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">Topics</h4>
-              <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+              <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Topics</h4>
+              <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 dark:divide-white/[0.08] dark:border-white/10">
                 {detail.topics.map((t) => (
                   <div key={t.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                    <span className="text-slate-700">{t.title}</span>
+                    <span className="text-slate-700 dark:text-slate-300">{t.title}</span>
                     <StatusBadge status={t.covered ? "COVERED" : "PLANNED"} />
                   </div>
                 ))}
-                {detail.topics.length === 0 && <p className="px-3 py-3 text-sm text-slate-400">No topics yet.</p>}
+                {detail.topics.length === 0 && (
+                  <p className="px-3 py-3 text-sm text-slate-400 dark:text-slate-500">No topics yet.</p>
+                )}
               </div>
             </div>
 
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">Missed / rescheduled lessons</h4>
+              <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Missed / rescheduled lessons</h4>
               {detail.missedOrRescheduledEntries.length === 0 ? (
-                <p className="text-sm text-slate-400">No missed lessons recorded.</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">No missed lessons recorded.</p>
               ) : (
-                <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+                <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 dark:divide-white/[0.08] dark:border-white/10">
                   {detail.missedOrRescheduledEntries.map((e) => (
                     <div key={e.id} className="flex items-center justify-between px-3 py-2 text-sm">
                       <div>
-                        <span className="text-slate-700">{e.topicTitle}</span>
-                        <span className="ml-2 text-xs text-slate-400">{e.plannedDate}</span>
-                        {e.reason && <p className="text-xs text-slate-400">{e.reason}</p>}
+                        <span className="text-slate-700 dark:text-slate-300">{e.topicTitle}</span>
+                        <span className="ml-2 text-xs tabular-nums text-slate-400 dark:text-slate-500">{formatDate(e.plannedDate)}</span>
+                        {e.reason && <p className="text-xs text-slate-400 dark:text-slate-500">{e.reason}</p>}
                       </div>
                       <StatusBadge status={e.status} />
                     </div>

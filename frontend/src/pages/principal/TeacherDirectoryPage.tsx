@@ -73,8 +73,8 @@ export function TeacherDirectoryPage() {
               <CardBody className="flex items-center gap-4">
                 <ProfilePhoto path={profileApi.teacherPhotoPath(t.teacherId)} hasPhoto={t.hasPhoto} name={t.name} size="md" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">{t.name}</p>
-                  <p className="truncate text-xs text-slate-500">{t.designation || "No designation set"}</p>
+                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{t.name}</p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">{t.designation || "No designation set"}</p>
                   <div className="mt-1.5">
                     <Badge tone="indigo">
                       {t.subjectCount} {t.subjectCount === 1 ? "class" : "classes"}
@@ -97,20 +97,22 @@ export function TeacherDirectoryPage() {
             <div className="flex items-center gap-4">
               <ProfilePhoto path={profileApi.teacherPhotoPath(detail.teacherId)} hasPhoto={detail.hasPhoto} name={detail.name} size="lg" />
               <div>
-                <p className="text-base font-semibold text-slate-900">{detail.name}</p>
-                <p className="text-sm text-slate-500">{detail.designation || "No designation set"}</p>
-                <p className="text-xs text-slate-400">{detail.email}</p>
+                <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{detail.name}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{detail.designation || "No designation set"}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">{detail.email}</p>
               </div>
             </div>
 
-            {detail.bio && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{detail.bio}</p>}
+            {detail.bio && (
+              <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 dark:bg-white/5 dark:text-slate-300">{detail.bio}</p>
+            )}
 
             <div>
-              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-500">
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
                 <BriefcaseIcon className="h-3.5 w-3.5" /> Subjects & Classes
               </h4>
               {detail.subjects.length === 0 ? (
-                <p className="text-sm text-slate-400">No subjects assigned.</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">No subjects assigned.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {detail.subjects.map((s) => (
@@ -123,20 +125,20 @@ export function TeacherDirectoryPage() {
             </div>
 
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500">Timetable</h4>
+              <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Timetable</h4>
               {detail.timetable.length === 0 ? (
-                <p className="text-sm text-slate-400">No timetable added.</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500">No timetable added.</p>
               ) : (
-                <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+                <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 dark:divide-white/[0.08] dark:border-white/10">
                   {[...detail.timetable]
                     .sort((a, b) => DAYS_OF_WEEK.indexOf(a.dayOfWeek) - DAYS_OF_WEEK.indexOf(b.dayOfWeek))
                     .map((slot) => (
                       <div key={slot.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                        <span className="font-medium text-slate-700">{DAY_LABELS[slot.dayOfWeek]}</span>
-                        <span className="text-slate-500">
+                        <span className="font-medium text-slate-700 dark:text-slate-200">{DAY_LABELS[slot.dayOfWeek]}</span>
+                        <span className="tabular-nums text-slate-500 dark:text-slate-400">
                           {slot.startTime.slice(0, 5)}–{slot.endTime.slice(0, 5)}
                         </span>
-                        <span className="text-slate-500">{slot.subjectName ?? "General"}</span>
+                        <span className="text-slate-500 dark:text-slate-400">{slot.subjectName ?? "General"}</span>
                       </div>
                     ))}
                 </div>

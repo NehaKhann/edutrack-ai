@@ -57,7 +57,7 @@ export function ProfilePhoto({
       <img
         src={imageUrl}
         alt={name}
-        className={clsx("rounded-full object-cover ring-2 ring-white", sizeClasses[size])}
+        className={clsx("rounded-full object-cover ring-2 ring-white dark:ring-navy-800", sizeClasses[size])}
       />
     );
   }
@@ -65,7 +65,7 @@ export function ProfilePhoto({
   return (
     <div
       className={clsx(
-        "flex items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 ring-2 ring-white",
+        "flex items-center justify-center rounded-full bg-brand-100 font-semibold text-brand-700 ring-2 ring-white dark:bg-brand-500/15 dark:text-brand-300 dark:ring-navy-800",
         sizeClasses[size]
       )}
     >
