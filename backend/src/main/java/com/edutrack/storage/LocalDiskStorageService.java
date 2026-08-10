@@ -1,6 +1,8 @@
 package com.edutrack.storage;
 
 import com.edutrack.common.ApiException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -14,6 +16,8 @@ import java.util.UUID;
 
 @Service
 public class LocalDiskStorageService implements FileStorageService {
+
+    private static final Logger log = LoggerFactory.getLogger(LocalDiskStorageService.class);
 
     private final Path basePath;
 
@@ -47,6 +51,15 @@ public class LocalDiskStorageService implements FileStorageService {
             return Files.readAllBytes(basePath.resolve(fileRef));
         } catch (IOException e) {
             throw ApiException.notFound("File not found: " + fileRef);
+        }
+    }
+
+    @Override
+    public void delete(String fileRef) {
+        try {
+            Files.deleteIfExists(basePath.resolve(fileRef));
+        } catch (IOException e) {
+            log.warn("Failed to delete stored file '{}': {}", fileRef, e.getMessage());
         }
     }
 }

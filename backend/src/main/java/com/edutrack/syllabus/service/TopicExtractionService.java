@@ -110,9 +110,6 @@ public class TopicExtractionService {
 
         JsonNode topicsJson = completeWithRetry(userPrompt);
 
-        List<Topic> existing = topicRepository.findBySyllabusIdOrderByOrderIndexAsc(syllabus.getId());
-        topicRepository.deleteAll(existing);
-
         List<Topic> topics = new ArrayList<>();
         int order = 0;
         int previousEndWeek = 0;
@@ -164,6 +161,9 @@ public class TopicExtractionService {
         if (topics.isEmpty()) {
             throw ApiException.badRequest("The AI could not identify any topics in this document. Try a clearer syllabus file, or add topics manually.");
         }
+
+        List<Topic> existing = topicRepository.findBySyllabusIdOrderByOrderIndexAsc(syllabus.getId());
+        topicRepository.deleteAll(existing);
 
         List<TopicResponse> saved = topicRepository.saveAll(topics).stream().map(TopicResponse::from).toList();
         return new TopicExtractionResult(saved, adjusted);

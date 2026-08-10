@@ -5,6 +5,7 @@ import com.edutrack.syllabus.dto.ConfirmLessonPlanRequest;
 import com.edutrack.syllabus.dto.LessonPlanEntryResponse;
 import com.edutrack.syllabus.service.LessonPlanService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
@@ -35,7 +36,11 @@ public class LessonPlanController {
 
     @PutMapping("/{entryId}/topic")
     public ApiResponse<LessonPlanEntryResponse> changeTopic(@PathVariable Long entryId, @RequestBody Map<String, Long> body) {
-        return ApiResponse.ok(lessonPlanService.updateEntryTopic(entryId, body.get("topicId")));
+        Long topicId = body.get("topicId");
+        if (topicId == null) {
+            throw com.edutrack.common.ApiException.badRequest("topicId is required");
+        }
+        return ApiResponse.ok(lessonPlanService.updateEntryTopic(entryId, topicId));
     }
 
     @PostMapping("/{entryId}/confirm")
@@ -43,6 +48,7 @@ public class LessonPlanController {
         return ApiResponse.ok(lessonPlanService.confirm(entryId, request.status(), request.reason()));
     }
 
-    public record AddLessonPlanEntryRequestWithSubject(Long subjectId, Long topicId, LocalDate plannedDate) {
+    public record AddLessonPlanEntryRequestWithSubject(
+            @NotNull Long subjectId, @NotNull Long topicId, LocalDate plannedDate) {
     }
 }

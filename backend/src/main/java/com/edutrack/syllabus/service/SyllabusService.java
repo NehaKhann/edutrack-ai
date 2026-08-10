@@ -137,13 +137,14 @@ public class SyllabusService {
     @Transactional(readOnly = true)
     public DocumentPreviewInfo getPreviewInfo(Long documentId) {
         SyllabusDocument doc = getOwnedDocument(documentId);
-        if (doc.getFileRef() == null || doc.getContentType() == null) {
+        String contentType = resolveContentType(doc);
+        if (doc.getFileRef() == null || contentType == null) {
             return new DocumentPreviewInfo("NONE", 0);
         }
-        if (doc.getContentType().startsWith("image/")) {
+        if (contentType.startsWith("image/")) {
             return new DocumentPreviewInfo("IMAGE", 1);
         }
-        if (doc.getContentType().equals("application/pdf")) {
+        if (contentType.equals("application/pdf")) {
             byte[] bytes = fileStorageService.load(doc.getFileRef());
             try (PDDocument pdf = PDDocument.load(new ByteArrayInputStream(bytes))) {
                 return new DocumentPreviewInfo("PDF", pdf.getNumberOfPages());
@@ -157,16 +158,17 @@ public class SyllabusService {
     @Transactional(readOnly = true)
     public PreviewImage getPreviewImage(Long documentId, int page) {
         SyllabusDocument doc = getOwnedDocument(documentId);
-        if (doc.getFileRef() == null || doc.getContentType() == null) {
+        String contentType = resolveContentType(doc);
+        if (doc.getFileRef() == null || contentType == null) {
             throw ApiException.notFound("Preview not available for this document");
         }
         byte[] bytes = fileStorageService.load(doc.getFileRef());
 
-        if (doc.getContentType().startsWith("image/")) {
-            return new PreviewImage(bytes, doc.getContentType());
+        if (contentType.startsWith("image/")) {
+            return new PreviewImage(bytes, contentType);
         }
 
-        if (doc.getContentType().equals("application/pdf")) {
+        if (contentType.equals("application/pdf")) {
             try (PDDocument pdf = PDDocument.load(new ByteArrayInputStream(bytes))) {
                 int index = page - 1;
                 if (index < 0 || index >= pdf.getNumberOfPages()) {
@@ -185,11 +187,30 @@ public class SyllabusService {
         throw ApiException.notFound("Preview not available for this document");
     }
 
+    /**
+     * Documents uploaded before content-type tracking was added have a null contentType even though their
+     * file is still on disk — infer it from the stored file's extension rather than permanently losing preview
+     * support for anything uploaded before that point.
+     */
+    private String resolveContentType(SyllabusDocument doc) {
+        if (doc.getContentType() != null) return doc.getContentType();
+        if (doc.getFileRef() == null) return null;
+        String ref = doc.getFileRef().toLowerCase();
+        if (ref.endsWith(".pdf")) return "application/pdf";
+        if (ref.endsWith(".jpg") || ref.endsWith(".jpeg")) return "image/jpeg";
+        if (ref.endsWith(".png")) return "image/png";
+        if (ref.endsWith(".webp")) return "image/webp";
+        return null;
+    }
+
     @Transactional
     public void deleteDocument(Long documentId) {
         SyllabusDocument doc = getOwnedDocument(documentId);
         assertNotConfirmed(doc.getSyllabus(), "removing files");
         syllabusDocumentRepository.delete(doc);
+        if (doc.getFileRef() != null) {
+            fileStorageService.delete(doc.getFileRef());
+        }
     }
 
     @Transactional
@@ -215,6 +236,9 @@ public class SyllabusService {
 
     @Transactional(readOnly = true)
     public List<SyllabusResponse> listForSubject(Long subjectId) {
+        Subject subject = subjectRepository.findById(subjectId)
+                .orElseThrow(() -> ApiException.notFound("Subject not found"));
+        assertOwnsSubject(subject);
         return syllabusRepository.findBySubjectId(subjectId).stream()
                 .map(s -> SyllabusResponse.from(s, hasTopics(s.getId())))
                 .toList();
@@ -247,6 +271,9 @@ public class SyllabusService {
 
     public void assertOwnsSubject(Subject subject) {
         AuthenticatedUser user = CurrentUser.get();
+        if (!subject.getClassSection().getSchool().getId().equals(user.getSchoolId())) {
+            throw ApiException.notFound("Subject not found");
+        }
         if (user.getRole() == Role.TEACHER && !subject.getTeacher().getId().equals(user.getUserId())) {
             throw ApiException.forbidden("You can only manage syllabi for subjects you teach");
         }

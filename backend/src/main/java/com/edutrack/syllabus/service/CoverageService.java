@@ -70,6 +70,9 @@ public class CoverageService {
     public SubjectCoverageDetail getSubjectDetail(Long subjectId) {
         Subject subject = subjectRepository.findById(subjectId)
                 .orElseThrow(() -> ApiException.notFound("Subject not found"));
+        if (!subject.getClassSection().getSchool().getId().equals(CurrentUser.get().getSchoolId())) {
+            throw ApiException.notFound("Subject not found");
+        }
         List<TopicResponse> topics = topicRepository.findBySyllabusSubjectIdOrderByOrderIndexAsc(subjectId)
                 .stream().map(TopicResponse::from).toList();
         List<LessonPlanEntryResponse> missed = lessonPlanEntryRepository

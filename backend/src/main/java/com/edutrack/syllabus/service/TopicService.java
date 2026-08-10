@@ -19,7 +19,9 @@ public class TopicService {
     private final TopicRepository topicRepository;
     private final SyllabusService syllabusService;
 
+    @Transactional(readOnly = true)
     public List<TopicResponse> listForSyllabus(Long syllabusId) {
+        syllabusService.getOwned(syllabusId);
         return topicRepository.findBySyllabusIdOrderByOrderIndexAsc(syllabusId).stream().map(TopicResponse::from).toList();
     }
 
@@ -57,6 +59,9 @@ public class TopicService {
             Long id = orderedIds.get(i);
             Topic topic = topics.stream().filter(t -> t.getId().equals(id)).findFirst()
                     .orElseThrow(() -> ApiException.notFound("Topic not found: " + id));
+            if (!topic.getSyllabus().getId().equals(syllabusId)) {
+                throw ApiException.badRequest("Topic does not belong to this syllabus: " + id);
+            }
             topic.setOrderIndex(i);
         }
         return topicRepository.saveAll(topics).stream()

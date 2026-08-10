@@ -65,8 +65,12 @@ public class TeacherProfileService {
         }
         Long teacherId = currentTeacherId();
         TeacherProfile profile = getOrCreate(teacherId);
+        String oldRef = profile.getProfilePhotoRef();
         String ref = fileStorageService.store(file, "profile-photos");
         profile.setProfilePhotoRef(ref);
+        if (oldRef != null) {
+            fileStorageService.delete(oldRef);
+        }
         profile.setUpdatedAt(Instant.now());
         teacherProfileRepository.save(profile);
         return buildResponse(teacherId);
@@ -74,6 +78,7 @@ public class TeacherProfileService {
 
     @Transactional(readOnly = true)
     public byte[] getPhotoBytes(Long teacherId) {
+        assertSameSchool(teacherId);
         TeacherProfile profile = teacherProfileRepository.findByUserId(teacherId)
                 .orElseThrow(() -> ApiException.notFound("No profile photo set"));
         if (profile.getProfilePhotoRef() == null) {
@@ -84,6 +89,7 @@ public class TeacherProfileService {
 
     @Transactional(readOnly = true)
     public String getPhotoContentType(Long teacherId) {
+        assertSameSchool(teacherId);
         TeacherProfile profile = teacherProfileRepository.findByUserId(teacherId)
                 .orElseThrow(() -> ApiException.notFound("No profile photo set"));
         String ref = profile.getProfilePhotoRef();

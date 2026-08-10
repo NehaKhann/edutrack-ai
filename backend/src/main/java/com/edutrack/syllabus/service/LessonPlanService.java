@@ -154,6 +154,10 @@ public class LessonPlanService {
         LessonPlanEntry entry = lessonPlanEntryRepository.findById(entryId)
                 .orElseThrow(() -> ApiException.notFound("Lesson plan entry not found"));
         AuthenticatedUser currentUser = CurrentUser.get();
+        Subject subject = entry.getTopic().getSyllabus().getSubject();
+        if (!subject.getClassSection().getSchool().getId().equals(currentUser.getSchoolId())) {
+            throw ApiException.notFound("Lesson plan entry not found");
+        }
         if (currentUser.getRole() == Role.TEACHER && !entry.getTeacher().getId().equals(currentUser.getUserId())) {
             throw ApiException.forbidden("You can only manage your own lesson plan");
         }
@@ -162,6 +166,9 @@ public class LessonPlanService {
 
     private AuthenticatedUser assertOwnsSubject(Subject subject) {
         AuthenticatedUser user = CurrentUser.get();
+        if (!subject.getClassSection().getSchool().getId().equals(user.getSchoolId())) {
+            throw ApiException.notFound("Subject not found");
+        }
         if (user.getRole() == Role.TEACHER && !subject.getTeacher().getId().equals(user.getUserId())) {
             throw ApiException.forbidden("You can only manage your own subjects");
         }

@@ -10,4 +10,7 @@ public interface FileStorageService {
     String store(MultipartFile file, String subDirectory);
 
     byte[] load(String fileRef);
+
+    /** Best-effort delete — callers should not fail the surrounding operation if this fails. */
+    void delete(String fileRef);
 }
