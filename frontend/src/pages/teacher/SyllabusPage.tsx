@@ -1110,7 +1110,7 @@ function TopicsPanel({
             description='Click "Extract with AI" to auto-generate topics from your confirmed syllabus text, or add one manually.'
           />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="space-y-2">
             {adding && (
               <TopicForm
                 onCancel={() => setAdding(false)}
@@ -1175,45 +1175,65 @@ function TopicRow({
   }
 
   return (
-    <div className="flex items-center gap-3 py-3">
-      <div className="flex flex-col">
+    <div className="flex items-start gap-3 rounded-xl border border-transparent px-2.5 py-3 transition-colors hover:border-slate-200/70 hover:bg-slate-50/70">
+      <div className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
         <button
           disabled={index === 0}
           onClick={() => onMove(index, -1)}
-          className="text-slate-400 hover:text-slate-700 disabled:opacity-30"
+          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30"
+          aria-label="Move up"
         >
           <ArrowUpIcon className="h-3.5 w-3.5" />
         </button>
+        <div className="h-px bg-slate-200" />
         <button
           disabled={index === total - 1}
           onClick={() => onMove(index, 1)}
-          className="text-slate-400 hover:text-slate-700 disabled:opacity-30"
+          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30"
+          aria-label="Move down"
         >
           <ArrowDownIcon className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-800">{topic.title}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold leading-snug text-navy-900">{topic.title}</span>
           {topic.covered && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+            <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100">
               <CheckCircleIcon className="h-3 w-3" /> Covered
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-xs text-slate-500">
-          {topic.plannedStartDate} &rarr; {topic.plannedEndDate}
-          {topic.startWeek && <span> &middot; Week {topic.startWeek}{topic.endWeek !== topic.startWeek ? `–${topic.endWeek}` : ""}</span>}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium tabular-nums text-slate-600">
+            {topic.plannedStartDate} &rarr; {topic.plannedEndDate}
+          </span>
+          {topic.startWeek && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-brand-700">
+              Week {topic.startWeek}
+              {topic.endWeek !== topic.startWeek ? `–${topic.endWeek}` : ""}
+            </span>
+          )}
         </div>
       </div>
 
-      <button onClick={() => setEditing(true)} className="text-slate-400 hover:text-brand-600">
-        <PencilSquareIcon className="h-4 w-4" />
-      </button>
-      <button onClick={onDelete} className="text-slate-400 hover:text-red-600">
-        <TrashIcon className="h-4 w-4" />
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+          aria-label="Edit topic"
+        >
+          <PencilSquareIcon className="h-4 w-4" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-coral-50 hover:text-coral-600"
+          aria-label="Delete topic"
+        >
+          <TrashIcon className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
