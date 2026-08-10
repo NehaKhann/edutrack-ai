@@ -8,6 +8,6 @@ public record MonthViewResponse(
         int year,
         int month,
         Set<DayOfWeek> weekendDays,
-        List<HolidayResponse> holidays
+        List<DayOverrideResponse> overrides
 ) {
 }

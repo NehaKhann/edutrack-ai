@@ -48,9 +48,12 @@ export function LessonPlanPage() {
       .getMonthView(now.getFullYear(), now.getMonth() + 1)
       .then((view) => {
         const todayDayOfWeek = JS_DAY_TO_ENUM[now.getDay()];
-        const holiday = view.holidays.find((h) => todayIso >= h.startDate && todayIso <= h.endDate);
-        if (holiday) setDayOffReason(`${holiday.name} — no school today.`);
-        else if (view.weekendDays.includes(todayDayOfWeek)) setDayOffReason("It's the weekend — no school today.");
+        const override = view.overrides.find((o) => o.date === todayIso);
+        if (override) {
+          if (override.status === "OFF") setDayOffReason(`${override.reason || "Off day"} — no school today.`);
+        } else if (view.weekendDays.includes(todayDayOfWeek)) {
+          setDayOffReason("It's the weekend — no school today.");
+        }
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps

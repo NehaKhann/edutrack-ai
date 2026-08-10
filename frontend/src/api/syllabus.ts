@@ -1,13 +1,14 @@
 import { apiClient, unwrap, unwrapWithMessage } from "./client";
-import type { SyllabusDto, SyllabusDocument, SyllabusUploadResult, Topic } from "../types";
+import type { DocumentPreviewInfo, SyllabusDto, SyllabusDocument, SyllabusUploadResult, Topic } from "../types";
 
 export function listSyllabi(subjectId: number): Promise<SyllabusDto[]> {
   return unwrap(apiClient.get("/api/syllabus", { params: { subjectId } }));
 }
 
-function filesFormData(files: File[]): FormData {
+function filesFormData(files: File[], manualText?: string): FormData {
   const form = new FormData();
   files.forEach((f) => form.append("files", f));
+  if (manualText && manualText.trim()) form.append("manualText", manualText.trim());
   return form;
 }
 
@@ -16,9 +17,10 @@ export function createSyllabus(params: {
   term: string;
   termStartDate: string;
   files: File[];
+  manualText?: string;
   onProgress?: (pct: number) => void;
 }): Promise<SyllabusUploadResult> {
-  const form = filesFormData(params.files);
+  const form = filesFormData(params.files, params.manualText);
   form.append("subjectId", String(params.subjectId));
   form.append("term", params.term);
   form.append("termStartDate", params.termStartDate);
@@ -35,9 +37,10 @@ export function createSyllabus(params: {
 export function addDocuments(
   syllabusId: number,
   files: File[],
+  manualText?: string,
   onProgress?: (pct: number) => void
 ): Promise<SyllabusUploadResult> {
-  const form = filesFormData(files);
+  const form = filesFormData(files, manualText);
   return unwrap(
     apiClient.post(`/api/syllabus/${syllabusId}/documents`, form, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -46,6 +49,15 @@ export function addDocuments(
       },
     })
   );
+}
+
+export function getPreviewInfo(documentId: number): Promise<DocumentPreviewInfo> {
+  return unwrap(apiClient.get(`/api/syllabus/documents/${documentId}/preview-info`));
+}
+
+export async function getPreviewImageUrl(documentId: number, page: number): Promise<string> {
+  const res = await apiClient.get(`/api/syllabus/documents/${documentId}/preview/${page}`, { responseType: "blob" });
+  return URL.createObjectURL(res.data);
 }
 
 export function listDocuments(syllabusId: number): Promise<SyllabusDocument[]> {

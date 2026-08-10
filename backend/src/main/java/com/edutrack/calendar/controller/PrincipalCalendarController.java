@@ -1,17 +1,20 @@
 package com.edutrack.calendar.controller;
 
 import com.edutrack.common.ApiResponse;
-import com.edutrack.calendar.dto.AddHolidayRequest;
-import com.edutrack.calendar.dto.HolidayResponse;
+import com.edutrack.calendar.dto.BulkUpdateRequest;
+import com.edutrack.calendar.dto.BulkUpdateResult;
+import com.edutrack.calendar.dto.MonthViewResponse;
+import com.edutrack.calendar.dto.SetDayRequest;
 import com.edutrack.calendar.dto.WeekendDaysRequest;
 import com.edutrack.calendar.service.SchoolCalendarService;
 import com.edutrack.security.CurrentUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.DayOfWeek;
-import java.util.List;
+import java.time.LocalDate;
 import java.util.Set;
 
 @RestController
@@ -21,20 +24,19 @@ public class PrincipalCalendarController {
 
     private final SchoolCalendarService schoolCalendarService;
 
-    @GetMapping("/holidays")
-    public ApiResponse<List<HolidayResponse>> listHolidays() {
-        return ApiResponse.ok(schoolCalendarService.listHolidays(CurrentUser.get().getSchoolId()));
+    @PostMapping("/day")
+    public ApiResponse<MonthViewResponse> setDay(@Valid @RequestBody SetDayRequest request) {
+        return ApiResponse.ok(schoolCalendarService.setDay(request));
     }
 
-    @PostMapping("/holidays")
-    public ApiResponse<HolidayResponse> addHoliday(@Valid @RequestBody AddHolidayRequest request) {
-        return ApiResponse.ok(schoolCalendarService.addHoliday(request));
+    @DeleteMapping("/day/{date}")
+    public ApiResponse<MonthViewResponse> resetDay(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return ApiResponse.ok(schoolCalendarService.resetDay(date));
     }
 
-    @DeleteMapping("/holidays/{holidayId}")
-    public ApiResponse<Void> deleteHoliday(@PathVariable Long holidayId) {
-        schoolCalendarService.deleteHoliday(holidayId);
-        return ApiResponse.ok(null);
+    @PostMapping("/bulk")
+    public ApiResponse<BulkUpdateResult> bulkUpdate(@Valid @RequestBody BulkUpdateRequest request) {
+        return ApiResponse.ok(schoolCalendarService.bulkUpdate(request));
     }
 
     @GetMapping("/weekend-days")

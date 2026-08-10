@@ -1,8 +1,10 @@
 package com.edutrack.syllabus.service;
 
 import com.edutrack.common.ApiException;
+import net.sourceforge.tess4j.ITessAPI;
 import net.sourceforge.tess4j.Tesseract;
 import net.sourceforge.tess4j.TesseractException;
+import net.sourceforge.tess4j.Word;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -20,6 +22,8 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -44,6 +48,10 @@ public class DocumentTextExtractor {
     private static final int MAX_OCR_PAGES = 15;
     private static final float OCR_RENDER_DPI = 300f;
 
+    /** Tesseract word confidence (0-100) below this is flagged to the teacher as worth double-checking. */
+    private static final double LOW_CONFIDENCE_WORD_THRESHOLD = 65.0;
+    private static final int MAX_LOW_CONFIDENCE_WORDS = 25;
+
     /**
      * Running OCR with both languages loaded at once measurably degrades English-only documents (Tesseract
      * occasionally "reads" ambiguous glyphs as stray Urdu script that isn't really there — observed directly
@@ -56,7 +64,22 @@ public class DocumentTextExtractor {
     @Value("${ocr.tessdata-path:}")
     private String tessdataPath;
 
-    public String extract(MultipartFile file) {
+    public record ExtractionResult(
+            String text,
+            String contentType,
+            Double ocrConfidence,
+            String ocrLanguage,
+            List<String> lowConfidenceWords
+    ) {
+    }
+
+    private record OcrOutcome(String text, double avgConfidence, List<String> lowConfidenceWords) {
+    }
+
+    private record AutoOcrOutcome(String text, double avgConfidence, String language, List<String> lowConfidenceWords) {
+    }
+
+    public ExtractionResult extract(MultipartFile file) {
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
             throw ApiException.badRequest(
@@ -65,20 +88,21 @@ public class DocumentTextExtractor {
 
         try (InputStream in = file.getInputStream()) {
             if (contentType.equals("application/pdf")) {
-                return extractPdf(in);
+                return extractPdf(in, contentType);
             }
             if (contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
-                return extractDocx(in);
+                return new ExtractionResult(extractDocx(in), contentType, null, null, List.of());
             }
             if (contentType.equals("application/msword")) {
-                return extractDoc(in);
+                return new ExtractionResult(extractDoc(in), contentType, null, null, List.of());
             }
             if (IMAGE_TYPES.contains(contentType)) {
                 BufferedImage image = ImageIO.read(in);
                 if (image == null) {
                     throw ApiException.badRequest("Could not decode the uploaded image.");
                 }
-                return ocrImageAuto(image);
+                AutoOcrOutcome outcome = ocrImageAuto(image);
+                return new ExtractionResult(outcome.text(), contentType, outcome.avgConfidence(), outcome.language(), outcome.lowConfidenceWords());
             }
         } catch (IOException e) {
             throw ApiException.badRequest("Failed to read uploaded file: " + e.getMessage());
@@ -87,22 +111,31 @@ public class DocumentTextExtractor {
         throw ApiException.badRequest("Unsupported file type.");
     }
 
-    private String extractPdf(InputStream in) {
+    private ExtractionResult extractPdf(InputStream in, String contentType) {
         try (PDDocument document = PDDocument.load(in)) {
             String textLayer = PdfTextExtractor.extractFromDocument(document);
             if (textLayer != null && textLayer.replaceAll("\\s+", "").length() >= MIN_TEXT_LAYER_CHARS) {
-                return textLayer;
+                return new ExtractionResult(textLayer, contentType, null, null, List.of());
             }
 
             log.info("PDF has no usable text layer (likely a scan/photo) — falling back to OCR on rendered pages");
             PDFRenderer renderer = new PDFRenderer(document);
             int pageCount = Math.min(document.getNumberOfPages(), MAX_OCR_PAGES);
-            StringBuilder combined = new StringBuilder();
+            StringBuilder combinedText = new StringBuilder();
+            List<Double> pageConfidences = new ArrayList<>();
+            Set<String> lowConfWords = new LinkedHashSet<>();
+            boolean usedUrdu = false;
             for (int i = 0; i < pageCount; i++) {
                 BufferedImage pageImage = renderer.renderImageWithDPI(i, OCR_RENDER_DPI, ImageType.RGB);
-                combined.append(ocrImageAuto(pageImage)).append("\n\n");
+                AutoOcrOutcome outcome = ocrImageAuto(pageImage);
+                combinedText.append(outcome.text()).append("\n\n");
+                pageConfidences.add(outcome.avgConfidence());
+                lowConfWords.addAll(outcome.lowConfidenceWords());
+                if (outcome.language().contains("urd")) usedUrdu = true;
             }
-            return combined.toString();
+            double avgConfidence = pageConfidences.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+            List<String> cappedLowConf = lowConfWords.stream().limit(MAX_LOW_CONFIDENCE_WORDS).toList();
+            return new ExtractionResult(combinedText.toString(), contentType, avgConfidence, usedUrdu ? "eng+urd" : "eng", cappedLowConf);
         } catch (IOException e) {
             throw ApiException.badRequest("Could not read the uploaded file as a PDF: " + e.getMessage());
         }
@@ -124,13 +157,14 @@ public class DocumentTextExtractor {
         }
     }
 
-    private String ocrImageAuto(BufferedImage image) {
-        String englishOnly = ocrImage(image, "eng");
-        if (looksLikeRealEnglish(englishOnly)) {
-            return englishOnly;
+    private AutoOcrOutcome ocrImageAuto(BufferedImage image) {
+        OcrOutcome englishOnly = ocrImage(image, "eng");
+        if (looksLikeRealEnglish(englishOnly.text())) {
+            return new AutoOcrOutcome(englishOnly.text(), englishOnly.avgConfidence(), "eng", englishOnly.lowConfidenceWords());
         }
         log.info("English-only OCR looked unreliable (not enough recognizable English text) — retrying with eng+urd");
-        return ocrImage(image, "eng+urd");
+        OcrOutcome combined = ocrImage(image, "eng+urd");
+        return new AutoOcrOutcome(combined.text(), combined.avgConfidence(), "eng+urd", combined.lowConfidenceWords());
     }
 
     /**
@@ -159,14 +193,25 @@ public class DocumentTextExtractor {
         return letterRatio >= MIN_LETTER_RATIO_FOR_ENGLISH_ONLY && wordRatio >= MIN_WORD_RATIO_FOR_ENGLISH_ONLY;
     }
 
-    private String ocrImage(BufferedImage image, String language) {
+    private OcrOutcome ocrImage(BufferedImage image, String language) {
         try {
             Tesseract tesseract = new Tesseract();
             tesseract.setLanguage(language);
             if (tessdataPath != null && !tessdataPath.isBlank()) {
                 tesseract.setDatapath(tessdataPath);
             }
-            return tesseract.doOCR(image);
+            String text = tesseract.doOCR(image);
+
+            List<Word> words = tesseract.getWords(image, ITessAPI.TessPageIteratorLevel.RIL_WORD);
+            double avgConfidence = words.isEmpty() ? 0 : words.stream().mapToDouble(Word::getConfidence).average().orElse(0);
+            List<String> lowConfidenceWords = words.stream()
+                    .filter(w -> w.getConfidence() < LOW_CONFIDENCE_WORD_THRESHOLD && !w.getText().isBlank())
+                    .map(Word::getText)
+                    .distinct()
+                    .limit(MAX_LOW_CONFIDENCE_WORDS)
+                    .toList();
+
+            return new OcrOutcome(text, avgConfidence, lowConfidenceWords);
         } catch (TesseractException e) {
             throw ApiException.internal("OCR failed on the uploaded document: " + e.getMessage());
         }

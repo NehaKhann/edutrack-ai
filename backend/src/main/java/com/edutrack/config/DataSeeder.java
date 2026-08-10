@@ -1,7 +1,8 @@
 package com.edutrack.config;
 
-import com.edutrack.calendar.entity.SchoolHoliday;
-import com.edutrack.calendar.repository.SchoolHolidayRepository;
+import com.edutrack.calendar.entity.CalendarDayOverride;
+import com.edutrack.calendar.entity.DayStatus;
+import com.edutrack.calendar.repository.CalendarDayOverrideRepository;
 import com.edutrack.org.entity.ClassSection;
 import com.edutrack.org.entity.Role;
 import com.edutrack.org.entity.School;
@@ -34,7 +35,7 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final ClassSectionRepository classSectionRepository;
     private final SubjectRepository subjectRepository;
-    private final SchoolHolidayRepository schoolHolidayRepository;
+    private final CalendarDayOverrideRepository calendarDayOverrideRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${seed.enabled:true}")
@@ -68,8 +69,13 @@ public class DataSeeder implements CommandLineRunner {
         subjectRepository.save(new Subject("Urdu", grade7, teacherBilal));
 
         LocalDate today = LocalDate.now();
-        schoolHolidayRepository.save(new SchoolHoliday(school, "Public Holiday", today.plusDays(5), today.plusDays(5)));
-        schoolHolidayRepository.save(new SchoolHoliday(school, "Mid-Term Break", today.plusDays(20), today.plusDays(26)));
+        calendarDayOverrideRepository.save(new CalendarDayOverride(school, today.plusDays(5), DayStatus.OFF, "Public Holiday", principal));
+        for (LocalDate d = today.plusDays(20); !d.isAfter(today.plusDays(26)); d = d.plusDays(1)) {
+            calendarDayOverrideRepository.save(new CalendarDayOverride(school, d, DayStatus.OFF, "Mid-Term Break", principal));
+        }
+        // Demonstrate the "exception" case too: a working Saturday, e.g. a makeup day.
+        LocalDate upcomingSaturday = today.with(java.time.temporal.TemporalAdjusters.next(DayOfWeek.SATURDAY));
+        calendarDayOverrideRepository.save(new CalendarDayOverride(school, upcomingSaturday, DayStatus.WORKING, "Makeup day", principal));
 
         log.info("========================================================");
         log.info(" EduTrack AI demo data seeded for '{}'", school.getName());

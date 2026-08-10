@@ -7,7 +7,9 @@ import com.edutrack.org.repository.SubjectRepository;
 import com.edutrack.security.AuthenticatedUser;
 import com.edutrack.security.CurrentUser;
 import com.edutrack.storage.FileStorageService;
+import com.edutrack.syllabus.dto.DocumentPreviewInfo;
 import com.edutrack.syllabus.dto.FailedFileResponse;
+import com.edutrack.syllabus.dto.PreviewImage;
 import com.edutrack.syllabus.dto.SyllabusDocumentResponse;
 import com.edutrack.syllabus.dto.SyllabusResponse;
 import com.edutrack.syllabus.dto.SyllabusUploadResult;
@@ -17,12 +19,20 @@ import com.edutrack.syllabus.repository.SyllabusDocumentRepository;
 import com.edutrack.syllabus.repository.SyllabusRepository;
 import com.edutrack.syllabus.repository.TopicRepository;
 import lombok.RequiredArgsConstructor;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -42,51 +52,64 @@ public class SyllabusService {
     private final DocumentTextExtractor documentTextExtractor;
 
     @Transactional
-    public SyllabusUploadResult createSyllabusWithDocuments(Long subjectId, String term, LocalDate termStartDate, List<MultipartFile> files) {
+    public SyllabusUploadResult createSyllabusWithDocuments(
+            Long subjectId, String term, LocalDate termStartDate, List<MultipartFile> files, String manualText) {
         Subject subject = subjectRepository.findById(subjectId)
                 .orElseThrow(() -> ApiException.notFound("Subject not found"));
         assertOwnsSubject(subject);
-        requireAtLeastOneFile(files);
+        requireAtLeastOneFileOrText(files, manualText);
 
         Syllabus syllabus = syllabusRepository.save(new Syllabus(subject, term, termStartDate));
-        return processFiles(syllabus, files);
+        return processFiles(syllabus, files, manualText);
     }
 
     @Transactional
-    public SyllabusUploadResult addDocuments(Long syllabusId, List<MultipartFile> files) {
+    public SyllabusUploadResult addDocuments(Long syllabusId, List<MultipartFile> files, String manualText) {
         Syllabus syllabus = getOwned(syllabusId);
         assertNotConfirmed(syllabus, "adding more files");
-        requireAtLeastOneFile(files);
-        return processFiles(syllabus, files);
+        requireAtLeastOneFileOrText(files, manualText);
+        return processFiles(syllabus, files, manualText);
     }
 
-    private void requireAtLeastOneFile(List<MultipartFile> files) {
-        if (files == null || files.isEmpty() || files.stream().allMatch(MultipartFile::isEmpty)) {
-            throw ApiException.badRequest("Please choose at least one file to upload");
+    private void requireAtLeastOneFileOrText(List<MultipartFile> files, String manualText) {
+        boolean hasFiles = files != null && files.stream().anyMatch(f -> !f.isEmpty());
+        boolean hasText = manualText != null && !manualText.isBlank();
+        if (!hasFiles && !hasText) {
+            throw ApiException.badRequest("Please choose at least one file, or type the syllabus text manually");
         }
     }
 
-    private SyllabusUploadResult processFiles(Syllabus syllabus, List<MultipartFile> files) {
+    private SyllabusUploadResult processFiles(Syllabus syllabus, List<MultipartFile> files, String manualText) {
         int nextOrder = (int) syllabusDocumentRepository.countBySyllabusId(syllabus.getId());
         List<SyllabusDocument> created = new ArrayList<>();
         List<FailedFileResponse> failures = new ArrayList<>();
 
-        for (MultipartFile file : files) {
-            if (file.isEmpty()) continue;
-            try {
-                String extractedText = documentTextExtractor.extract(file);
-                if (extractedText == null || extractedText.isBlank()) {
-                    failures.add(new FailedFileResponse(file.getOriginalFilename(),
-                            "No readable text found. Try a clearer scan/photo."));
-                    continue;
+        if (files != null) {
+            for (MultipartFile file : files) {
+                if (file.isEmpty()) continue;
+                try {
+                    DocumentTextExtractor.ExtractionResult extraction = documentTextExtractor.extract(file);
+                    if (extraction.text() == null || extraction.text().isBlank()) {
+                        failures.add(new FailedFileResponse(file.getOriginalFilename(),
+                                "No readable text found. Try a clearer scan/photo."));
+                        continue;
+                    }
+                    String fileRef = fileStorageService.store(file, "syllabus");
+                    String lowConfWords = extraction.lowConfidenceWords().isEmpty()
+                            ? null : String.join(",", extraction.lowConfidenceWords());
+                    SyllabusDocument doc = new SyllabusDocument(syllabus, file.getOriginalFilename(), fileRef, extraction.text(), nextOrder++,
+                            extraction.contentType(), extraction.ocrConfidence(), extraction.ocrLanguage(), lowConfWords);
+                    created.add(syllabusDocumentRepository.save(doc));
+                } catch (RuntimeException e) {
+                    log.warn("Failed to process syllabus file '{}': {}", file.getOriginalFilename(), e.getMessage());
+                    failures.add(new FailedFileResponse(file.getOriginalFilename(), e.getMessage()));
                 }
-                String fileRef = fileStorageService.store(file, "syllabus");
-                SyllabusDocument doc = new SyllabusDocument(syllabus, file.getOriginalFilename(), fileRef, extractedText, nextOrder++);
-                created.add(syllabusDocumentRepository.save(doc));
-            } catch (RuntimeException e) {
-                log.warn("Failed to process syllabus file '{}': {}", file.getOriginalFilename(), e.getMessage());
-                failures.add(new FailedFileResponse(file.getOriginalFilename(), e.getMessage()));
             }
+        }
+
+        if (manualText != null && !manualText.isBlank()) {
+            SyllabusDocument doc = new SyllabusDocument(syllabus, "Manual entry", null, manualText.trim(), nextOrder++);
+            created.add(syllabusDocumentRepository.save(doc));
         }
 
         return new SyllabusUploadResult(
@@ -109,6 +132,57 @@ public class SyllabusService {
         assertNotConfirmed(doc.getSyllabus(), "editing its content");
         doc.setExtractedText(text);
         return SyllabusDocumentResponse.from(syllabusDocumentRepository.save(doc));
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentPreviewInfo getPreviewInfo(Long documentId) {
+        SyllabusDocument doc = getOwnedDocument(documentId);
+        if (doc.getFileRef() == null || doc.getContentType() == null) {
+            return new DocumentPreviewInfo("NONE", 0);
+        }
+        if (doc.getContentType().startsWith("image/")) {
+            return new DocumentPreviewInfo("IMAGE", 1);
+        }
+        if (doc.getContentType().equals("application/pdf")) {
+            byte[] bytes = fileStorageService.load(doc.getFileRef());
+            try (PDDocument pdf = PDDocument.load(new ByteArrayInputStream(bytes))) {
+                return new DocumentPreviewInfo("PDF", pdf.getNumberOfPages());
+            } catch (IOException e) {
+                return new DocumentPreviewInfo("NONE", 0);
+            }
+        }
+        return new DocumentPreviewInfo("NONE", 0);
+    }
+
+    @Transactional(readOnly = true)
+    public PreviewImage getPreviewImage(Long documentId, int page) {
+        SyllabusDocument doc = getOwnedDocument(documentId);
+        if (doc.getFileRef() == null || doc.getContentType() == null) {
+            throw ApiException.notFound("Preview not available for this document");
+        }
+        byte[] bytes = fileStorageService.load(doc.getFileRef());
+
+        if (doc.getContentType().startsWith("image/")) {
+            return new PreviewImage(bytes, doc.getContentType());
+        }
+
+        if (doc.getContentType().equals("application/pdf")) {
+            try (PDDocument pdf = PDDocument.load(new ByteArrayInputStream(bytes))) {
+                int index = page - 1;
+                if (index < 0 || index >= pdf.getNumberOfPages()) {
+                    throw ApiException.notFound("Page not found");
+                }
+                PDFRenderer renderer = new PDFRenderer(pdf);
+                BufferedImage image = renderer.renderImageWithDPI(index, 150f, ImageType.RGB);
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                ImageIO.write(image, "png", out);
+                return new PreviewImage(out.toByteArray(), "image/png");
+            } catch (IOException e) {
+                throw ApiException.internal("Could not render PDF page: " + e.getMessage());
+            }
+        }
+
+        throw ApiException.notFound("Preview not available for this document");
     }
 
     @Transactional

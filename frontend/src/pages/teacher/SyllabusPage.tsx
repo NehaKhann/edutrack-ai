@@ -3,6 +3,8 @@ import clsx from "clsx";
 import {
   ArrowUpIcon,
   ArrowDownIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
   PencilSquareIcon,
   TrashIcon,
   SparklesIcon,
@@ -10,6 +12,7 @@ import {
   CloudArrowUpIcon,
   CheckCircleIcon,
   DocumentIcon,
+  PencilIcon,
   XMarkIcon,
   LockClosedIcon,
 } from "@heroicons/react/24/outline";
@@ -24,7 +27,7 @@ import { Spinner } from "../../components/Spinner";
 import { getMySubjects } from "../../api/subjects";
 import * as syllabusApi from "../../api/syllabus";
 import { errorMessage } from "../../api/client";
-import type { Subject, SyllabusDto, SyllabusDocument, Topic } from "../../types";
+import type { DocumentPreviewInfo, Subject, SyllabusDto, SyllabusDocument, Topic } from "../../types";
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"];
 const MAX_FILE_SIZE_MB = 20;
@@ -226,6 +229,8 @@ function NewSyllabusForm({
   const [term, setTerm] = useState("Term 1, 2026");
   const [termStartDate, setTermStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [files, setFiles] = useState<File[]>([]);
+  const [showManual, setShowManual] = useState(false);
+  const [manualText, setManualText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -249,12 +254,19 @@ function NewSyllabusForm({
   }
 
   async function handleSubmit() {
-    if (!subjectId || files.length === 0) return;
+    if (!subjectId || (files.length === 0 && !manualText.trim())) return;
     setUploading(true);
     setProgress(0);
     setError(null);
     try {
-      const result = await syllabusApi.createSyllabus({ subjectId, term, termStartDate, files, onProgress: setProgress });
+      const result = await syllabusApi.createSyllabus({
+        subjectId,
+        term,
+        termStartDate,
+        files,
+        manualText,
+        onProgress: setProgress,
+      });
       if (result.failedFiles.length > 0) {
         setError(describeFailedFiles(result.failedFiles));
       }
@@ -299,14 +311,38 @@ function NewSyllabusForm({
           </div>
         )}
 
+        {!showManual ? (
+          <button
+            type="button"
+            onClick={() => setShowManual(true)}
+            className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700"
+          >
+            <PencilIcon className="h-3.5 w-3.5" /> Or type it manually instead — recommended for poor-quality scans (e.g. Urdu)
+          </button>
+        ) : (
+          <Field label="Syllabus text (typed manually)" hint="Best option right now for low-quality or Urdu scans.">
+            <textarea
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              rows={8}
+              placeholder="Type or paste the syllabus content here..."
+              className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            />
+          </Field>
+        )}
+
         {uploading && (
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${progress}%` }} />
           </div>
         )}
 
-        <Button className="w-full" onClick={handleSubmit} loading={uploading} disabled={files.length === 0}>
-          {uploading ? `Uploading ${progress}%` : `Upload ${files.length > 0 ? files.length : ""} file(s)`}
+        <Button className="w-full" onClick={handleSubmit} loading={uploading} disabled={files.length === 0 && !manualText.trim()}>
+          {uploading
+            ? `Uploading ${progress}%`
+            : files.length > 0
+            ? `Upload ${files.length} file(s)`
+            : "Create syllabus"}
         </Button>
       </CardBody>
     </Card>
@@ -470,6 +506,9 @@ function DocumentsPanel({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [unconfirming, setUnconfirming] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [manualText, setManualText] = useState("");
+  const [addingManual, setAddingManual] = useState(false);
 
   async function handleSaveText(documentId: number, text: string) {
     try {
@@ -499,6 +538,21 @@ function DocumentsPanel({
       }
     } catch (e) {
       onError(e);
+    }
+  }
+
+  async function handleAddManualText() {
+    if (!manualText.trim()) return;
+    setAddingManual(true);
+    try {
+      const result = await syllabusApi.addDocuments(syllabus.id, [], manualText);
+      onDocumentsChange([...documents, ...result.documents]);
+      setManualText("");
+      setShowManual(false);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setAddingManual(false);
     }
   }
 
@@ -565,10 +619,137 @@ function DocumentsPanel({
       {!syllabus.confirmed && (
         <>
           <MultiFileDropzone onFilesSelected={handleAddFiles} />
+
+          {!showManual ? (
+            <button
+              type="button"
+              onClick={() => setShowManual(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-700"
+            >
+              <PencilIcon className="h-3.5 w-3.5" /> Or type it manually instead
+            </button>
+          ) : (
+            <div className="space-y-2 rounded-lg border border-slate-100 p-3">
+              <textarea
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                rows={6}
+                placeholder="Type or paste syllabus content here..."
+                className="block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" size="sm" onClick={() => { setShowManual(false); setManualText(""); }}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleAddManualText} loading={addingManual} disabled={!manualText.trim()}>
+                  Add typed text
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Button className="w-full" onClick={handleConfirmClick} loading={confirming} disabled={documents.length === 0}>
             Confirm Syllabus
           </Button>
         </>
+      )}
+    </div>
+  );
+}
+
+function ConfidenceBadge({ confidence, isManual }: { confidence: number | null; isManual: boolean }) {
+  if (isManual) {
+    return (
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">Typed text</span>
+    );
+  }
+  if (confidence == null) return null;
+  const rounded = Math.round(confidence);
+  const colorClass =
+    confidence >= 85 ? "bg-green-100 text-green-700" : confidence >= 65 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700";
+  return <span className={clsx("rounded-full px-2 py-0.5 text-[11px] font-semibold", colorClass)}>{rounded}% confidence</span>;
+}
+
+function DocumentPreviewPane({ documentId }: { documentId: number }) {
+  const [info, setInfo] = useState<DocumentPreviewInfo | null>(null);
+  const [page, setPage] = useState(1);
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    syllabusApi
+      .getPreviewInfo(documentId)
+      .then((i) => {
+        if (!alive) return;
+        setInfo(i);
+        setPage(1);
+      })
+      .catch(() => {
+        if (alive) setInfo({ type: "NONE", pageCount: 0 });
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [documentId]);
+
+  useEffect(() => {
+    if (!info || info.type === "NONE") return;
+    let alive = true;
+    let objectUrl: string | null = null;
+    syllabusApi.getPreviewImageUrl(documentId, page).then((url) => {
+      if (!alive) {
+        URL.revokeObjectURL(url);
+        return;
+      }
+      objectUrl = url;
+      setImgUrl(url);
+    });
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [info, documentId, page]);
+
+  if (loading) {
+    return (
+      <div className="flex h-56 items-center justify-center rounded-lg bg-slate-50">
+        <Spinner className="h-5 w-5" />
+      </div>
+    );
+  }
+
+  if (!info || info.type === "NONE") {
+    return (
+      <div className="flex h-56 items-center justify-center rounded-lg bg-slate-50 p-4 text-center text-xs text-slate-400">
+        Preview not available for this file type — use the extracted text.
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      {imgUrl ? (
+        <img src={imgUrl} alt="Original scan" className="max-h-72 w-full rounded-lg border border-slate-200 object-contain" />
+      ) : (
+        <div className="flex h-56 w-full items-center justify-center rounded-lg bg-slate-50">
+          <Spinner className="h-5 w-5" />
+        </div>
+      )}
+      {info.type === "PDF" && info.pageCount > 1 && (
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="disabled:opacity-30">
+            <ArrowLeftIcon className="h-3.5 w-3.5" />
+          </button>
+          Page {page} of {info.pageCount}
+          <button disabled={page >= info.pageCount} onClick={() => setPage((p) => p + 1)} className="disabled:opacity-30">
+            <ArrowRightIcon className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -589,6 +770,10 @@ function DocumentCard({
   const [saving, setSaving] = useState(false);
   const dirty = text !== document.extractedText;
 
+  const isManual = document.contentType === null && document.ocrConfidence === null;
+  const lowQuality =
+    document.ocrConfidence != null && (document.ocrConfidence < 65 || (document.ocrLanguage ?? "").includes("urd"));
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -604,6 +789,7 @@ function DocumentCard({
         <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
           <DocumentIcon className="h-4 w-4 text-slate-400" />
           {document.originalFilename}
+          <ConfidenceBadge confidence={document.ocrConfidence} isManual={isManual} />
         </span>
         {!readOnly && (
           <button onClick={onDelete} className="text-slate-400 hover:text-red-600">
@@ -611,28 +797,55 @@ function DocumentCard({
           </button>
         )}
       </CardHeader>
-      <CardBody>
-        {readOnly ? (
-          <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700">
-            {document.extractedText}
-          </pre>
-        ) : (
-          <>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={10}
-              className="block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs leading-relaxed text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
-            />
-            {dirty && (
-              <div className="mt-2 flex justify-end">
-                <Button size="sm" onClick={handleSave} loading={saving}>
-                  Save changes
-                </Button>
-              </div>
-            )}
-          </>
+      <CardBody className="space-y-3">
+        {document.lowConfidenceWords.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="font-medium text-slate-500">Check:</span>
+            {document.lowConfidenceWords.map((w, i) => (
+              <span key={i} className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">
+                {w}
+              </span>
+            ))}
+          </div>
         )}
+
+        {lowQuality && !readOnly && (
+          <Alert type="warning">
+            Extraction quality looks low{(document.ocrLanguage ?? "").includes("urd") ? " for this Urdu scan" : ""} — try a
+            clearer, flatter, well-lit scan, or{" "}
+            <button type="button" className="font-semibold underline" onClick={() => setText("")}>
+              switch to Manual Entry
+            </button>
+            .
+          </Alert>
+        )}
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <DocumentPreviewPane documentId={document.id} />
+          <div>
+            {readOnly ? (
+              <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 font-mono text-xs leading-relaxed text-slate-700">
+                {document.extractedText}
+              </pre>
+            ) : (
+              <>
+                <textarea
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  rows={10}
+                  className="block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs leading-relaxed text-slate-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+                />
+                {dirty && (
+                  <div className="mt-2 flex justify-end">
+                    <Button size="sm" onClick={handleSave} loading={saving}>
+                      Save changes
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
       </CardBody>
     </Card>
   );

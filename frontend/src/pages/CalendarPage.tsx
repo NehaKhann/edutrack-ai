@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, PlusIcon, TrashIcon, CalendarDaysIcon } from "@heroicons/react/24/outline";
+import { ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon, BoltIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import { Button } from "../components/Button";
-import { Field, TextInput } from "../components/FormFields";
+import { Field, TextInput, Select } from "../components/FormFields";
+import { Modal } from "../components/Modal";
 import { Alert } from "../components/Alert";
 import { Spinner } from "../components/Spinner";
 import { useAuth } from "../auth/AuthContext";
 import * as calendarApi from "../api/calendar";
 import { errorMessage } from "../api/client";
 import { DAYS_OF_WEEK, type DayOfWeek } from "../types/profile";
-import type { Holiday, MonthView } from "../types/calendar";
+import type { DayOverride, DayStatus, MonthView } from "../types/calendar";
 
 const JS_DAY_TO_ENUM: DayOfWeek[] = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 const DAY_SHORT: Record<DayOfWeek, string> = {
@@ -21,6 +22,15 @@ const DAY_SHORT: Record<DayOfWeek, string> = {
   FRIDAY: "Fri",
   SATURDAY: "Sat",
   SUNDAY: "Sun",
+};
+const DAY_LONG: Record<DayOfWeek, string> = {
+  MONDAY: "Monday",
+  TUESDAY: "Tuesday",
+  WEDNESDAY: "Wednesday",
+  THURSDAY: "Thursday",
+  FRIDAY: "Friday",
+  SATURDAY: "Saturday",
+  SUNDAY: "Sunday",
 };
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -35,6 +45,27 @@ function toIso(year: number, month: number, day: number) {
   return `${year}-${pad(month)}-${pad(day)}`;
 }
 
+function parseIso(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatLong(iso: string): string {
+  const d = parseIso(iso);
+  return `${DAY_LONG[JS_DAY_TO_ENUM[d.getDay()]]}, ${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function countMatchingDays(start: string, end: string, dayOfWeek: DayOfWeek | ""): number {
+  const startDate = parseIso(start);
+  const endDate = parseIso(end);
+  if (endDate < startDate) return 0;
+  let count = 0;
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    if (!dayOfWeek || JS_DAY_TO_ENUM[d.getDay()] === dayOfWeek) count++;
+  }
+  return count;
+}
+
 export function CalendarPage() {
   const { user } = useAuth();
   const isPrincipal = user?.role === "PRINCIPAL" || user?.role === "ADMIN";
@@ -43,10 +74,9 @@ export function CalendarPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [monthView, setMonthView] = useState<MonthView | null>(null);
-  const [allHolidays, setAllHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAddHoliday, setShowAddHoliday] = useState(false);
+  const [selectedIso, setSelectedIso] = useState<string | null>(null);
 
   function loadMonth(y: number, m: number) {
     setLoading(true);
@@ -61,11 +91,6 @@ export function CalendarPage() {
   useEffect(() => {
     loadMonth(year, month);
   }, [year, month]);
-
-  useEffect(() => {
-    if (!isPrincipal) return;
-    calendarApi.listHolidays().then(setAllHolidays).catch(() => {});
-  }, [isPrincipal, monthView]);
 
   function goToMonth(delta: number) {
     let newMonth = month + delta;
@@ -94,51 +119,30 @@ export function CalendarPage() {
     return cells;
   }, [year, month]);
 
-  function holidayFor(iso: string): Holiday | undefined {
-    return monthView?.holidays.find((h) => iso >= h.startDate && iso <= h.endDate);
-  }
-
-  async function handleAddHoliday(payload: { name: string; startDate: string; endDate: string }) {
-    await calendarApi.addHoliday(payload);
-    loadMonth(year, month);
-    setShowAddHoliday(false);
-  }
-
-  async function handleDeleteHoliday(id: number) {
-    if (!confirm("Remove this holiday?")) return;
-    try {
-      await calendarApi.deleteHoliday(id);
-      loadMonth(year, month);
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  }
+  const overrideByIso = useMemo(() => {
+    const map = new Map<string, DayOverride>();
+    monthView?.overrides.forEach((o) => map.set(o.date, o));
+    return map;
+  }, [monthView]);
 
   const todayIso = toIso(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  const selectedCell = selectedIso ? grid.find((c) => c?.iso === selectedIso) ?? null : null;
+
+  function handleSaved(updated: MonthView) {
+    setMonthView(updated);
+    setSelectedIso(null);
+  }
 
   return (
     <div>
       <PageHeader
         title="School Calendar"
-        description="Weekends and holidays — feeding directly into lesson planning and auto-rescheduling."
-        actions={
-          isPrincipal ? (
-            <Button size="sm" variant="secondary" onClick={() => setShowAddHoliday((v) => !v)}>
-              <PlusIcon className="h-4 w-4" /> Add holiday
-            </Button>
-          ) : undefined
-        }
+        description="Weekends and day-by-day exceptions — feeding directly into lesson planning and auto-rescheduling."
       />
 
       {error && (
         <div className="mb-4">
           <Alert type="error">{error}</Alert>
-        </div>
-      )}
-
-      {isPrincipal && showAddHoliday && (
-        <div className="mb-5">
-          <AddHolidayForm onCancel={() => setShowAddHoliday(false)} onSave={handleAddHoliday} onError={(e) => setError(errorMessage(e))} />
         </div>
       )}
 
@@ -157,6 +161,11 @@ export function CalendarPage() {
               <ChevronRightIcon className="h-5 w-5" />
             </button>
           </div>
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-200" /> Weekend</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /> Off</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400" /> Extra working</span>
+          </div>
         </CardHeader>
         <CardBody>
           {loading || !monthView ? (
@@ -173,23 +182,40 @@ export function CalendarPage() {
               {grid.map((cell, i) => {
                 if (!cell) return <div key={i} />;
                 const isWeekend = monthView.weekendDays.includes(cell.dayOfWeek);
-                const holiday = holidayFor(cell.iso);
+                const override = overrideByIso.get(cell.iso);
                 const isToday = cell.iso === todayIso;
+
+                let cellClass = "border-slate-100 bg-white";
+                let labelClass = "text-slate-700";
+                if (override?.status === "OFF") {
+                  cellClass = "border-amber-300 bg-amber-50";
+                  labelClass = "text-amber-700";
+                } else if (override?.status === "WORKING") {
+                  cellClass = "border-emerald-300 bg-emerald-50";
+                  labelClass = "text-emerald-700";
+                } else if (isWeekend) {
+                  cellClass = "border-slate-200 bg-slate-100";
+                  labelClass = "text-slate-500";
+                }
+
                 return (
-                  <div
+                  <button
                     key={cell.iso}
-                    title={holiday?.name}
-                    className={`flex min-h-[64px] flex-col rounded-lg border p-1.5 text-xs ${
-                      holiday
-                        ? "border-amber-200 bg-amber-50"
-                        : isWeekend
-                        ? "border-slate-200 bg-slate-100"
-                        : "border-slate-100 bg-white"
-                    } ${isToday ? "ring-2 ring-brand-500" : ""}`}
+                    type="button"
+                    disabled={!isPrincipal}
+                    onClick={() => setSelectedIso(cell.iso)}
+                    title={override?.reason ?? undefined}
+                    className={`flex min-h-[64px] flex-col rounded-lg border p-1.5 text-left text-xs transition-colors ${cellClass} ${
+                      isToday ? "ring-2 ring-brand-500" : ""
+                    } ${isPrincipal ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
                   >
-                    <span className={`font-medium ${holiday || isWeekend ? "text-slate-500" : "text-slate-700"}`}>{cell.day}</span>
-                    {holiday && <span className="mt-1 truncate text-[10px] font-medium text-amber-700">{holiday.name}</span>}
-                  </div>
+                    <span className={`font-medium ${labelClass}`}>{cell.day}</span>
+                    {override && (
+                      <span className={`mt-1 truncate text-[10px] font-medium ${labelClass}`}>
+                        {override.status === "OFF" ? (override.reason || "Off") : (override.reason || "Working")}
+                      </span>
+                    )}
+                  </button>
                 );
               })}
             </div>
@@ -198,57 +224,62 @@ export function CalendarPage() {
       </Card>
 
       {isPrincipal && (
-        <Card className="mt-5">
-          <CardHeader>
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-              <CalendarDaysIcon className="h-4 w-4 text-slate-400" /> All holidays
-            </h3>
-          </CardHeader>
-          <CardBody className="space-y-1">
-            {allHolidays.length === 0 ? (
-              <p className="py-2 text-sm text-slate-400">No holidays added yet.</p>
-            ) : (
-              allHolidays.map((h) => (
-                <div key={h.id} className="flex items-center justify-between rounded-lg px-2 py-2 text-sm hover:bg-slate-50">
-                  <div>
-                    <span className="font-medium text-slate-800">{h.name}</span>
-                    <span className="ml-2 text-slate-500">
-                      {h.startDate}
-                      {h.endDate !== h.startDate ? ` → ${h.endDate}` : ""}
-                    </span>
-                  </div>
-                  <button onClick={() => handleDeleteHoliday(h.id)} className="text-slate-400 hover:text-red-600">
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              ))
-            )}
-          </CardBody>
-        </Card>
+        <div className="mt-5">
+          <BulkUpdateCard onDone={(v) => loadMonth(v.year, v.month)} onError={(e) => setError(errorMessage(e))} />
+        </div>
+      )}
+
+      {isPrincipal && selectedCell && monthView && (
+        <DayModal
+          iso={selectedCell.iso}
+          isWeekendByDefault={monthView.weekendDays.includes(selectedCell.dayOfWeek)}
+          override={overrideByIso.get(selectedCell.iso)}
+          onClose={() => setSelectedIso(null)}
+          onSaved={handleSaved}
+          onError={(e) => setError(errorMessage(e))}
+        />
       )}
     </div>
   );
 }
 
-function AddHolidayForm({
-  onCancel,
-  onSave,
+function DayModal({
+  iso,
+  isWeekendByDefault,
+  override,
+  onClose,
+  onSaved,
   onError,
 }: {
-  onCancel: () => void;
-  onSave: (payload: { name: string; startDate: string; endDate: string }) => Promise<void>;
+  iso: string;
+  isWeekendByDefault: boolean;
+  override: DayOverride | undefined;
+  onClose: () => void;
+  onSaved: (v: MonthView) => void;
   onError: (e: unknown) => void;
 }) {
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const [name, setName] = useState("");
-  const [startDate, setStartDate] = useState(todayIso);
-  const [endDate, setEndDate] = useState(todayIso);
+  const defaultStatus: DayStatus = isWeekendByDefault ? "OFF" : "WORKING";
+  const [status, setStatus] = useState<DayStatus>(override?.status ?? defaultStatus);
+  const [reason, setReason] = useState(override?.reason ?? "");
   const [saving, setSaving] = useState(false);
 
-  async function handleSubmit() {
+  async function handleSave() {
     setSaving(true);
     try {
-      await onSave({ name, startDate, endDate });
+      const updated = await calendarApi.setDay(iso, status, reason.trim() || undefined);
+      onSaved(updated);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReset() {
+    setSaving(true);
+    try {
+      const updated = await calendarApi.resetDay(iso);
+      onSaved(updated);
     } catch (e) {
       onError(e);
     } finally {
@@ -257,28 +288,170 @@ function AddHolidayForm({
   }
 
   return (
-    <Card>
-      <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-4">
-        <div className="sm:col-span-2">
-          <Field label="Holiday name">
-            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Eid ul Fitr" autoFocus />
-          </Field>
+    <Modal open onClose={onClose} title={formatLong(iso)} widthClass="max-w-md">
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500">
+          Normally a <span className="font-medium text-slate-700">{defaultStatus === "OFF" ? "weekend / off" : "working"}</span> day.
+        </p>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setStatus("WORKING")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+              status === "WORKING" ? "border-emerald-400 bg-emerald-50 text-emerald-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+            }`}
+          >
+            Working day
+          </button>
+          <button
+            type="button"
+            onClick={() => setStatus("OFF")}
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+              status === "OFF" ? "border-amber-400 bg-amber-50 text-amber-700" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+            }`}
+          >
+            Holiday / Off
+          </button>
         </div>
+
+        <Field label="Reason (optional)">
+          <TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Eid ul Fitr, Makeup day" />
+        </Field>
+
+        {override && (
+          <p className="text-xs text-slate-400">
+            Last changed{override.changedByName ? ` by ${override.changedByName}` : ""}
+            {override.changedAt ? ` on ${new Date(override.changedAt).toLocaleString()}` : ""}.
+          </p>
+        )}
+
+        <div className="flex items-center justify-between border-t border-slate-100 pt-4">
+          {override ? (
+            <Button variant="ghost" size="sm" onClick={handleReset} disabled={saving}>
+              <ArrowPathIcon className="h-4 w-4" /> Reset to default
+            </Button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} loading={saving}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function BulkUpdateCard({
+  onDone,
+  onError,
+}: {
+  onDone: (v: { year: number; month: number }) => void;
+  onError: (e: unknown) => void;
+}) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [startDate, setStartDate] = useState(todayIso);
+  const [endDate, setEndDate] = useState(todayIso);
+  const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek | "">("");
+  const [status, setStatus] = useState<DayStatus>("OFF");
+  const [reason, setReason] = useState("");
+  const [confirmCount, setConfirmCount] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  function handleApplyClick() {
+    setResult(null);
+    if (endDate < startDate) {
+      onError(new Error("End date must be on or after the start date"));
+      return;
+    }
+    const n = countMatchingDays(startDate, endDate, dayOfWeek);
+    if (n === 0) {
+      onError(new Error("No matching days in that range"));
+      return;
+    }
+    setConfirmCount(n);
+  }
+
+  async function handleConfirm() {
+    setSaving(true);
+    try {
+      const res = await calendarApi.bulkUpdate({ startDate, endDate, dayOfWeek: dayOfWeek || null, status, reason: reason.trim() || undefined });
+      setResult(`Updated ${res.updatedCount} day(s).`);
+      setConfirmCount(null);
+      const [y, m] = startDate.split("-").map(Number);
+      onDone({ year: y, month: m });
+    } catch (e) {
+      onError(e);
+      setConfirmCount(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <BoltIcon className="h-4 w-4 text-slate-400" /> Bulk update
+        </h3>
+      </CardHeader>
+      <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-5">
         <Field label="Start date">
           <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </Field>
         <Field label="End date">
           <TextInput type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </Field>
-        <div className="col-span-full flex justify-end gap-2">
-          <Button variant="secondary" size="sm" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleSubmit} loading={saving} disabled={!name}>
-            Save
+        <Field label="Apply to">
+          <Select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value as DayOfWeek | "")}>
+            <option value="">Every day</option>
+            {DAYS_OF_WEEK.map((d) => (
+              <option key={d} value={d}>
+                Only {DAY_LONG[d]}s
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Set to">
+          <Select value={status} onChange={(e) => setStatus(e.target.value as DayStatus)}>
+            <option value="OFF">Off / Holiday</option>
+            <option value="WORKING">Working</option>
+          </Select>
+        </Field>
+        <Field label="Reason (optional)">
+          <TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Summer break" />
+        </Field>
+        <div className="col-span-full flex items-center justify-between">
+          {result ? <p className="text-sm text-emerald-600">{result}</p> : <span />}
+          <Button size="sm" variant="secondary" onClick={handleApplyClick}>
+            Apply
           </Button>
         </div>
       </CardBody>
+
+      <Modal open={confirmCount !== null} onClose={() => setConfirmCount(null)} title="Confirm bulk update" widthClass="max-w-sm">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            This will mark <span className="font-semibold">{confirmCount}</span> day(s) between {startDate} and {endDate} as{" "}
+            <span className="font-semibold">{status === "OFF" ? "Off / Holiday" : "Working"}</span>. Continue?
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setConfirmCount(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleConfirm} loading={saving}>
+              Confirm
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Card>
   );
 }
@@ -317,7 +490,7 @@ function WeekendDaysCard({ onError }: { onError: (e: unknown) => void }) {
   return (
     <Card>
       <CardHeader>
-        <h3 className="text-sm font-semibold text-slate-800">Weekend days</h3>
+        <h3 className="text-sm font-semibold text-slate-800">Weekend days (default pattern)</h3>
       </CardHeader>
       <CardBody className="flex flex-wrap gap-2">
         {DAYS_OF_WEEK.map((d) => {

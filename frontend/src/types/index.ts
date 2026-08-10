@@ -34,6 +34,15 @@ export interface SyllabusDocument {
   originalFilename: string;
   extractedText: string;
   orderIndex: number;
+  contentType: string | null;
+  ocrConfidence: number | null;
+  ocrLanguage: string | null;
+  lowConfidenceWords: string[];
+}
+
+export interface DocumentPreviewInfo {
+  type: "IMAGE" | "PDF" | "NONE";
+  pageCount: number;
 }
 
 export interface FailedFile {
