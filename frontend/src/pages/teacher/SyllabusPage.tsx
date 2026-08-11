@@ -17,6 +17,9 @@ import {
   XMarkIcon,
   LockClosedIcon,
   CheckIcon,
+  MagnifyingGlassIcon,
+  ExclamationTriangleIcon,
+  BookOpenIcon,
 } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { SubjectSelect } from "../../components/SubjectSelect";
@@ -28,8 +31,8 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
-import { DateRangeChip } from "../../components/DateRangeChip";
-import { formatDate } from "../../utils/date";
+import { SkeletonRows } from "../../components/Skeleton";
+import { formatDate, formatDateRange } from "../../utils/date";
 import { getMySubjects } from "../../api/subjects";
 import * as syllabusApi from "../../api/syllabus";
 import { errorMessage } from "../../api/client";
@@ -135,7 +138,7 @@ export function SyllabusPage() {
             <SubjectSelect subjects={subjects} value={subjectId} onChange={setSubjectId} />
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
             <div className="lg:col-span-1 space-y-3">
               <Button size="sm" variant="secondary" className="w-full" onClick={() => setCreatingNew(true)}>
                 <PlusIcon className="h-4 w-4" /> New Syllabus
@@ -178,7 +181,7 @@ export function SyllabusPage() {
               )}
             </div>
 
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-3">
               {creatingNew ? (
                 <NewSyllabusForm
                   subjectId={subjectId}
@@ -397,6 +400,7 @@ function SyllabusWorkspace({
   const [documents, setDocuments] = useState<SyllabusDocument[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
+  const [topicsLoading, setTopicsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
@@ -410,7 +414,12 @@ function SyllabusWorkspace({
       .then(setDocuments)
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setDocsLoading(false));
-    syllabusApi.listTopics(syllabus.id).then(setTopics).catch((e) => setError(errorMessage(e)));
+    setTopicsLoading(true);
+    syllabusApi
+      .listTopics(syllabus.id)
+      .then(setTopics)
+      .catch((e) => setError(errorMessage(e)))
+      .finally(() => setTopicsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [syllabus.id]);
 
@@ -540,6 +549,7 @@ function SyllabusWorkspace({
         <TopicsPanel
           syllabus={syllabus}
           topics={topics}
+          loading={topicsLoading}
           onExtract={handleExtract}
           extracting={extracting}
           onTopicsChange={setTopics}
@@ -1002,6 +1012,7 @@ function DocumentCard({
 function TopicsPanel({
   syllabus,
   topics,
+  loading,
   onExtract,
   extracting,
   onTopicsChange,
@@ -1010,6 +1021,7 @@ function TopicsPanel({
 }: {
   syllabus: SyllabusDto;
   topics: Topic[];
+  loading: boolean;
   onExtract: () => void;
   extracting: boolean;
   onTopicsChange: (topics: Topic[]) => void;
@@ -1027,6 +1039,19 @@ function TopicsPanel({
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "covered">("all");
+
+  const coveredCount = topics.filter((t) => t.covered).length;
+  const percent = topics.length > 0 ? Math.round((coveredCount / topics.length) * 100) : 0;
+
+  const filteredTopics = topics.filter((t) => {
+    if (statusFilter === "covered" && !t.covered) return false;
+    if (statusFilter === "pending" && t.covered) return false;
+    if (search.trim() && !t.title.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    return true;
+  });
+  const hasActiveFilter = search.trim() !== "" || statusFilter !== "all";
 
   async function handleApplyShift() {
     const days = parseInt(shiftDays, 10);
@@ -1073,7 +1098,7 @@ function TopicsPanel({
   }
 
   function toggleSelectAll() {
-    setSelectedIds((prev) => (prev.size === topics.length ? new Set() : new Set(topics.map((t) => t.id))));
+    setSelectedIds((prev) => (prev.size === filteredTopics.length ? new Set() : new Set(filteredTopics.map((t) => t.id))));
   }
 
   async function confirmBulkDeleteAction() {
@@ -1140,8 +1165,8 @@ function TopicsPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-[220px] flex-1">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{syllabus.term} &mdash; Topics</h3>
             {syllabus.planningFinalized && (
@@ -1150,11 +1175,51 @@ function TopicsPanel({
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {topics.filter((t) => t.covered).length} of {topics.length} topics covered
-          </p>
+          {topics.length > 0 && (
+            <div className="mt-2 flex items-center gap-2.5">
+              <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${percent}%` }} />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {coveredCount} of {topics.length} covered <span className="tabular-nums">({percent}%)</span>
+              </p>
+            </div>
+          )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={onExtract} loading={extracting}>
+          <SparklesIcon className="h-4 w-4" /> {topics.length > 0 ? "Re-extract with AI" : "Extract with AI"}
+        </Button>
+      </CardHeader>
+
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-3 dark:border-white/10">
+        {topics.length > 0 && (
+          <>
+            <div className="relative min-w-[160px] flex-1 sm:max-w-xs">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <TextInput
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search topics..."
+                className="h-8 pl-8 text-xs"
+              />
+            </div>
+            <div className="inline-flex rounded-lg border border-slate-300 bg-white/80 p-0.5 dark:border-white/15 dark:bg-white/5">
+              {(["all", "pending", "covered"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={clsx(
+                    "rounded-md px-2.5 py-1 text-xs font-semibold capitalize transition-colors",
+                    statusFilter === f ? "bg-brand-600 text-white" : "text-slate-500 dark:text-slate-400"
+                  )}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {topics.length > 0 && (
             <Button size="sm" variant="secondary" onClick={toggleSelectMode}>
               {selectMode ? <XMarkIcon className="h-4 w-4" /> : <CheckIcon className="h-4 w-4" />}
@@ -1169,9 +1234,6 @@ function TopicsPanel({
           <Button size="sm" variant="secondary" onClick={() => setAdding(true)}>
             <PlusIcon className="h-4 w-4" /> Add topic
           </Button>
-          <Button size="sm" onClick={onExtract} loading={extracting}>
-            <SparklesIcon className="h-4 w-4" /> {topics.length > 0 ? "Re-extract with AI" : "Extract with AI"}
-          </Button>
           <Button
             size="sm"
             variant={syllabus.planningFinalized ? "secondary" : "primary"}
@@ -1182,17 +1244,18 @@ function TopicsPanel({
             <CheckCircleIcon className="h-4 w-4" /> {syllabus.planningFinalized ? "Un-finalize" : "Finalize Planning"}
           </Button>
         </div>
-      </CardHeader>
+      </div>
+
       {selectMode && (
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-brand-50/60 px-4 py-3 dark:border-white/10 dark:bg-brand-500/10">
           <button
             onClick={toggleSelectAll}
             className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-300"
           >
-            {selectedIds.size === topics.length ? "Clear all" : "Select all"}
+            {selectedIds.size === filteredTopics.length ? "Clear all" : "Select all"}
           </button>
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            {selectedIds.size} of {topics.length} selected
+            {selectedIds.size} of {filteredTopics.length} selected
           </span>
           <div className="ml-auto">
             <Button size="sm" variant="danger" disabled={selectedIds.size === 0} onClick={() => setConfirmBulkDelete(true)}>
@@ -1221,10 +1284,18 @@ function TopicsPanel({
         </div>
       )}
       <CardBody>
-        {topics.length === 0 && !adding ? (
+        {loading ? (
+          <SkeletonRows count={5} />
+        ) : topics.length === 0 && !adding ? (
           <EmptyState
+            icon={<BookOpenIcon className="h-8 w-8" />}
             title="No topics yet"
-            description='Click "Extract with AI" to auto-generate topics from your confirmed syllabus text, or add one manually.'
+            description="Extract topics automatically from your confirmed syllabus text, or add one manually."
+            action={
+              <Button size="sm" onClick={onExtract} loading={extracting}>
+                <SparklesIcon className="h-4 w-4" /> Extract with AI
+              </Button>
+            }
           />
         ) : (
           <div className="space-y-2">
@@ -1235,20 +1306,39 @@ function TopicsPanel({
                 defaultStart={syllabus.termStartDate}
               />
             )}
-            {topics.map((topic, index) => (
-              <TopicRow
-                key={topic.id}
-                topic={topic}
-                index={index}
-                total={topics.length}
-                onMove={handleMove}
-                onDelete={() => setDeleteTarget(topic)}
-                onSave={(values) => handleSaveEdit(topic.id, values)}
-                selectMode={selectMode}
-                selected={selectedIds.has(topic.id)}
-                onToggleSelect={() => toggleSelect(topic.id)}
-              />
-            ))}
+            {filteredTopics.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <p className="text-sm text-slate-500 dark:text-slate-400">No topics match your search or filter.</p>
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("all");
+                  }}
+                  className="text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                >
+                  Clear search &amp; filter
+                </button>
+              </div>
+            ) : (
+              filteredTopics.map((topic) => {
+                const index = topics.indexOf(topic);
+                return (
+                  <TopicRow
+                    key={topic.id}
+                    topic={topic}
+                    index={index}
+                    total={topics.length}
+                    disableReorder={hasActiveFilter}
+                    onMove={handleMove}
+                    onDelete={() => setDeleteTarget(topic)}
+                    onSave={(values) => handleSaveEdit(topic.id, values)}
+                    selectMode={selectMode}
+                    selected={selectedIds.has(topic.id)}
+                    onToggleSelect={() => toggleSelect(topic.id)}
+                  />
+                );
+              })
+            )}
           </div>
         )}
       </CardBody>
@@ -1292,6 +1382,7 @@ function TopicRow({
   topic,
   index,
   total,
+  disableReorder = false,
   onMove,
   onDelete,
   onSave,
@@ -1302,6 +1393,7 @@ function TopicRow({
   topic: Topic;
   index: number;
   total: number;
+  disableReorder?: boolean;
   onMove: (index: number, dir: -1 | 1) => void;
   onDelete: () => void;
   onSave: (values: TopicFormValues) => void;
@@ -1324,15 +1416,25 @@ function TopicRow({
     );
   }
 
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const isOverdue = !topic.covered && topic.plannedEndDate < todayIso;
+  const accentClass = topic.covered
+    ? "border-l-teal-400"
+    : isOverdue
+      ? "border-l-coral-400"
+      : "border-l-transparent";
+
   return (
     <div
       onClick={selectMode ? onToggleSelect : undefined}
       className={clsx(
-        "flex items-start gap-3 rounded-xl border px-2.5 py-3 transition-colors",
+        "flex items-start gap-2.5 rounded-lg border border-l-4 px-2 py-2.5 transition-colors",
+        accentClass,
+        "border-y-transparent border-r-transparent",
         selectMode && "cursor-pointer",
         selectMode && selected
-          ? "border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10"
-          : "border-transparent hover:border-slate-200/70 hover:bg-slate-50/70 dark:hover:border-white/10 dark:hover:bg-white/5"
+          ? "bg-brand-50/60 ring-1 ring-inset ring-brand-300 dark:bg-brand-500/10 dark:ring-brand-400/40"
+          : "hover:bg-slate-50/70 dark:hover:bg-white/5"
       )}
     >
       {selectMode && (
@@ -1352,48 +1454,51 @@ function TopicRow({
           <CheckIcon className="h-3.5 w-3.5" />
         </button>
       )}
-      <div className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5">
+      <div className="flex flex-col overflow-hidden rounded-md border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5">
         <button
-          disabled={index === 0 || selectMode}
+          disabled={index === 0 || selectMode || disableReorder}
           onClick={() => onMove(index, -1)}
-          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
+          title={disableReorder ? "Clear search & filter to reorder" : undefined}
+          className="px-1 py-0.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
           aria-label="Move up"
         >
-          <ArrowUpIcon className="h-3.5 w-3.5" />
+          <ArrowUpIcon className="h-3 w-3" />
         </button>
         <div className="h-px bg-slate-200 dark:bg-white/10" />
         <button
-          disabled={index === total - 1 || selectMode}
+          disabled={index === total - 1 || selectMode || disableReorder}
           onClick={() => onMove(index, 1)}
-          className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
+          title={disableReorder ? "Clear search & filter to reorder" : undefined}
+          className="px-1 py-0.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
           aria-label="Move down"
         >
-          <ArrowDownIcon className="h-3.5 w-3.5" />
+          <ArrowDownIcon className="h-3 w-3" />
         </button>
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-semibold leading-snug text-navy-900 dark:text-slate-100">{topic.title}</span>
-          {topic.covered && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20">
-              <CheckCircleIcon className="h-3 w-3" /> Covered
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm font-medium leading-snug text-navy-900 dark:text-slate-100">{topic.title}</span>
+          {topic.covered ? (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20">
+              <CheckCircleIcon className="h-2.5 w-2.5" /> Covered
             </span>
-          )}
+          ) : isOverdue ? (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-coral-50 px-1.5 py-0.5 text-[10px] font-semibold text-coral-700 ring-1 ring-inset ring-coral-100 dark:bg-coral-500/10 dark:text-coral-300 dark:ring-coral-500/20">
+              <ExclamationTriangleIcon className="h-2.5 w-2.5" /> Overdue
+            </span>
+          ) : null}
         </div>
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <DateRangeChip start={topic.plannedStartDate} end={topic.plannedEndDate} />
+        <p className="mt-1 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
+          {formatDateRange(topic.plannedStartDate, topic.plannedEndDate)}
           {topic.startWeek && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-medium tabular-nums text-brand-700 dark:bg-brand-500/10 dark:text-brand-300">
-              Week {topic.startWeek}
-              {topic.endWeek !== topic.startWeek ? `–${topic.endWeek}` : ""}
-            </span>
+            <> &middot; Wk {topic.startWeek}{topic.endWeek !== topic.startWeek ? `–${topic.endWeek}` : ""}</>
           )}
-        </div>
+        </p>
       </div>
 
       {!selectMode && (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             onClick={() => setEditing(true)}
             className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
