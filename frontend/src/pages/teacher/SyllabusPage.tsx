@@ -1489,12 +1489,16 @@ function TopicRow({
             </span>
           ) : null}
         </div>
-        <p className="mt-1 text-[11px] tabular-nums text-slate-400 dark:text-slate-500">
-          {formatDateRange(topic.plannedStartDate, topic.plannedEndDate)}
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-medium tabular-nums text-slate-600 dark:text-slate-300">
+            {formatDateRange(topic.plannedStartDate, topic.plannedEndDate)}
+          </span>
           {topic.startWeek && (
-            <> &middot; Wk {topic.startWeek}{topic.endWeek !== topic.startWeek ? `–${topic.endWeek}` : ""}</>
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-white/10 dark:text-slate-300">
+              Wk {topic.startWeek}{topic.endWeek !== topic.startWeek ? `–${topic.endWeek}` : ""}
+            </span>
           )}
-        </p>
+        </div>
       </div>
 
       {!selectMode && (
