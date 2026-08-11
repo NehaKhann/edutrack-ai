@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeftIcon, ChevronRightIcon, ArrowPathIcon, BoltIcon } from "@heroicons/react/24/outline";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ArrowPathIcon,
+  BoltIcon,
+  CalendarDaysIcon,
+  PencilSquareIcon,
+  ClipboardDocumentCheckIcon,
+} from "@heroicons/react/24/outline";
 import { PageHeader } from "../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import { Button } from "../components/Button";
@@ -7,12 +15,13 @@ import { Field, TextInput, Select } from "../components/FormFields";
 import { Modal } from "../components/Modal";
 import { Alert } from "../components/Alert";
 import { Spinner } from "../components/Spinner";
+import { Toast } from "../components/Toast";
 import { useAuth } from "../auth/AuthContext";
 import * as calendarApi from "../api/calendar";
 import { errorMessage } from "../api/client";
 import { formatDate } from "../utils/date";
 import { DAYS_OF_WEEK, type DayOfWeek } from "../types/profile";
-import type { DayOverride, DayStatus, MonthView } from "../types/calendar";
+import type { DayOverride, DayStatus, DayStatusInfo, MonthView } from "../types/calendar";
 
 const JS_DAY_TO_ENUM: DayOfWeek[] = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 const DAY_SHORT: Record<DayOfWeek, string> = {
@@ -37,6 +46,20 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+const STATUS_LABEL: Record<DayStatus, string> = {
+  WORKING: "Working",
+  OFF: "Off",
+  EXAM: "Exam",
+  EVENT: "School Event",
+};
+
+const CELL_CLASSES: Record<DayStatus, { cell: string; label: string; dot: string }> = {
+  WORKING: { cell: "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5", label: "text-slate-700 dark:text-slate-300", dot: "bg-slate-300 dark:bg-slate-600" },
+  OFF: { cell: "border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10", label: "text-amber-700 dark:text-amber-300", dot: "bg-amber-400" },
+  EXAM: { cell: "border-coral-300 bg-coral-50 dark:border-coral-500/30 dark:bg-coral-500/10", label: "text-coral-700 dark:text-coral-300", dot: "bg-coral-400" },
+  EVENT: { cell: "border-brand-300 bg-brand-50 dark:border-brand-500/30 dark:bg-brand-500/10", label: "text-brand-700 dark:text-brand-300", dot: "bg-brand-400" },
+};
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -75,16 +98,20 @@ export function CalendarPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [monthView, setMonthView] = useState<MonthView | null>(null);
+  const [dayStatusList, setDayStatusList] = useState<DayStatusInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [selectedIso, setSelectedIso] = useState<string | null>(null);
 
   function loadMonth(y: number, m: number) {
     setLoading(true);
     setError(null);
-    calendarApi
-      .getMonthView(y, m)
-      .then(setMonthView)
+    Promise.all([calendarApi.getMonthView(y, m), calendarApi.getDayStatusGrid(y, m)])
+      .then(([mv, statuses]) => {
+        setMonthView(mv);
+        setDayStatusList(statuses);
+      })
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
   }
@@ -107,6 +134,11 @@ export function CalendarPage() {
     setYear(newYear);
   }
 
+  function goToToday() {
+    setYear(now.getFullYear());
+    setMonth(now.getMonth() + 1);
+  }
+
   const grid = useMemo(() => {
     const daysInMonth = new Date(year, month, 0).getDate();
     const firstDayJs = new Date(year, month - 1, 1).getDay();
@@ -126,52 +158,71 @@ export function CalendarPage() {
     return map;
   }, [monthView]);
 
+  const statusInfoByIso = useMemo(() => {
+    const map = new Map<string, DayStatusInfo>();
+    dayStatusList.forEach((s) => map.set(s.date, s));
+    return map;
+  }, [dayStatusList]);
+
   const todayIso = toIso(now.getFullYear(), now.getMonth() + 1, now.getDate());
   const selectedCell = selectedIso ? grid.find((c) => c?.iso === selectedIso) ?? null : null;
 
   function handleSaved(updated: MonthView) {
     setMonthView(updated);
+    calendarApi.getDayStatusGrid(updated.year, updated.month).then(setDayStatusList).catch(() => {});
     setSelectedIso(null);
   }
 
+  function handleNoteSaved(iso: string, note: string) {
+    setDayStatusList((list) => {
+      const info = list.find((d) => d.date === iso);
+      if (info) return list.map((d) => (d.date === iso ? { ...d, personalNote: note || null } : d));
+      return list;
+    });
+    setToast(note ? "Note saved." : "Note removed.");
+  }
+
   return (
-    <div>
+    <div className="space-y-5">
       <PageHeader
         title="School Calendar"
-        description="Weekends and day-by-day exceptions — feeding directly into lesson planning and auto-rescheduling."
+        description="Weekends, exceptions, exams, and events — feeding directly into lesson planning and auto-rescheduling."
       />
 
-      {error && (
-        <div className="mb-4">
-          <Alert type="error">{error}</Alert>
-        </div>
-      )}
+      {error && <Alert type="error">{error}</Alert>}
 
-      {isPrincipal && <div className="mb-5"><WeekendDaysCard onError={(e) => setError(errorMessage(e))} /></div>}
+      {isPrincipal && <WeekendDaysCard onError={(e) => setError(errorMessage(e))} />}
 
       <Card>
         <CardHeader className="flex flex-wrap items-center justify-between gap-y-2">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => goToMonth(-1)}
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.08]"
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
-            </button>
-            <h3 className="w-40 text-center text-sm font-semibold text-slate-800 dark:text-slate-100">
-              {MONTH_NAMES[month - 1]} {year}
-            </h3>
-            <button
-              onClick={() => goToMonth(1)}
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.08]"
-            >
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={goToToday}>
+              Today
+            </Button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => goToMonth(-1)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.08]"
+              >
+                <ChevronLeftIcon className="h-5 w-5" />
+              </button>
+              <h3 className="w-36 text-center text-sm font-semibold text-slate-800 dark:text-slate-100">
+                {MONTH_NAMES[month - 1]} {year}
+              </h3>
+              <button
+                onClick={() => goToMonth(1)}
+                className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.08]"
+              >
+                <ChevronRightIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-500" /> Weekend</span>
             <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Off</span>
             <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-teal-400" /> Extra working</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-coral-400" /> Exam</span>
+            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-brand-400" /> Event</span>
           </div>
         </CardHeader>
         <CardBody>
@@ -190,38 +241,41 @@ export function CalendarPage() {
                 if (!cell) return <div key={i} />;
                 const isWeekend = monthView.weekendDays.includes(cell.dayOfWeek);
                 const override = overrideByIso.get(cell.iso);
+                const info = statusInfoByIso.get(cell.iso);
                 const isToday = cell.iso === todayIso;
+                const isPast = cell.iso < todayIso;
 
-                let cellClass = "border-slate-100 bg-white dark:border-white/10 dark:bg-white/5";
-                let labelClass = "text-slate-700 dark:text-slate-300";
-                if (override?.status === "OFF") {
-                  cellClass = "border-amber-300 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-500/10";
-                  labelClass = "text-amber-700 dark:text-amber-300";
-                } else if (override?.status === "WORKING") {
-                  cellClass = "border-teal-300 bg-teal-50 dark:border-teal-500/30 dark:bg-teal-500/10";
-                  labelClass = "text-teal-700 dark:text-teal-300";
-                } else if (isWeekend) {
-                  cellClass = "border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-white/[0.08]";
-                  labelClass = "text-slate-500 dark:text-slate-400";
-                }
+                let status: DayStatus = override?.status ?? (isWeekend ? "OFF" : "WORKING");
+                const styles = CELL_CLASSES[status];
+
+                const showDiaryPending = !isPrincipal && !isWeekend && status === "WORKING" && !info?.diarySubmitted && (isToday || isPast);
+                const showAttendancePending = !isPrincipal && !isWeekend && status === "WORKING" && !info?.attendanceMarked && (isToday || isPast);
+                const onLeave = !isPrincipal && info?.onApprovedLeave;
 
                 return (
                   <button
                     key={cell.iso}
                     type="button"
-                    disabled={!isPrincipal}
                     onClick={() => setSelectedIso(cell.iso)}
                     title={override?.reason ?? undefined}
-                    className={`flex min-h-[64px] flex-col rounded-lg border p-1.5 text-left text-xs transition-colors ${cellClass} ${
+                    className={`relative flex min-h-[68px] cursor-pointer flex-col rounded-lg border p-1.5 text-left text-xs transition-colors hover:brightness-95 ${styles.cell} ${
                       isToday ? "ring-2 ring-brand-500" : ""
-                    } ${isPrincipal ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}
+                    } ${onLeave ? "outline outline-2 outline-offset-1 outline-blue-400" : ""}`}
                   >
-                    <span className={`font-medium ${labelClass}`}>{cell.day}</span>
+                    <span className={`font-medium ${styles.label}`}>{cell.day}</span>
                     {override && (
-                      <span className={`mt-1 truncate text-[10px] font-medium ${labelClass}`}>
-                        {override.status === "OFF" ? (override.reason || "Off") : (override.reason || "Working")}
+                      <span className={`mt-0.5 truncate text-[10px] font-medium ${styles.label}`}>
+                        {override.reason || STATUS_LABEL[status]}
                       </span>
                     )}
+                    {info?.personalNote && (
+                      <span className="mt-0.5 truncate text-[10px] italic text-slate-400 dark:text-slate-500">{info.personalNote}</span>
+                    )}
+                    <span className="mt-auto flex items-center gap-1 pt-1">
+                      {onLeave && <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="You're on leave" />}
+                      {showDiaryPending && <PencilSquareIcon className="h-3 w-3 text-amber-500" title="Diary not submitted" />}
+                      {showAttendancePending && <ClipboardDocumentCheckIcon className="h-3 w-3 text-coral-500" title="Attendance not marked" />}
+                    </span>
                   </button>
                 );
               })}
@@ -230,45 +284,61 @@ export function CalendarPage() {
         </CardBody>
       </Card>
 
-      {isPrincipal && (
-        <div className="mt-5">
-          <BulkUpdateCard onDone={(v) => loadMonth(v.year, v.month)} onError={(e) => setError(errorMessage(e))} />
-        </div>
-      )}
+      {isPrincipal && <BulkUpdateCard onDone={(v) => loadMonth(v.year, v.month)} onError={(e) => setError(errorMessage(e))} />}
 
-      {isPrincipal && selectedCell && monthView && (
-        <DayModal
+      {selectedCell && monthView && (
+        <DayDetailModal
           iso={selectedCell.iso}
+          isPrincipal={isPrincipal}
           isWeekendByDefault={monthView.weekendDays.includes(selectedCell.dayOfWeek)}
           override={overrideByIso.get(selectedCell.iso)}
+          info={statusInfoByIso.get(selectedCell.iso)}
           onClose={() => setSelectedIso(null)}
           onSaved={handleSaved}
+          onNoteSaved={handleNoteSaved}
           onError={(e) => setError(errorMessage(e))}
         />
       )}
+
+      <Toast message={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
 
-function DayModal({
+const DAY_TYPE_OPTIONS: { status: DayStatus; label: string; activeClass: string }[] = [
+  { status: "WORKING", label: "Working day", activeClass: "border-teal-400 bg-teal-50 text-teal-700 dark:border-teal-500/40 dark:bg-teal-500/10 dark:text-teal-300" },
+  { status: "OFF", label: "Holiday / Off", activeClass: "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300" },
+  { status: "EXAM", label: "Exam", activeClass: "border-coral-400 bg-coral-50 text-coral-700 dark:border-coral-500/40 dark:bg-coral-500/10 dark:text-coral-300" },
+  { status: "EVENT", label: "School Event", activeClass: "border-brand-400 bg-brand-50 text-brand-700 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-300" },
+];
+
+function DayDetailModal({
   iso,
+  isPrincipal,
   isWeekendByDefault,
   override,
+  info,
   onClose,
   onSaved,
+  onNoteSaved,
   onError,
 }: {
   iso: string;
+  isPrincipal: boolean;
   isWeekendByDefault: boolean;
   override: DayOverride | undefined;
+  info: DayStatusInfo | undefined;
   onClose: () => void;
   onSaved: (v: MonthView) => void;
+  onNoteSaved: (iso: string, note: string) => void;
   onError: (e: unknown) => void;
 }) {
   const defaultStatus: DayStatus = isWeekendByDefault ? "OFF" : "WORKING";
   const [status, setStatus] = useState<DayStatus>(override?.status ?? defaultStatus);
   const [reason, setReason] = useState(override?.reason ?? "");
   const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState(info?.personalNote ?? "");
+  const [savingNote, setSavingNote] = useState(false);
 
   async function handleSave() {
     setSaving(true);
@@ -294,70 +364,116 @@ function DayModal({
     }
   }
 
+  async function handleSaveNote() {
+    setSavingNote(true);
+    try {
+      await calendarApi.saveNote(iso, note.trim());
+      onNoteSaved(iso, note.trim());
+    } catch (e) {
+      onError(e);
+    } finally {
+      setSavingNote(false);
+    }
+  }
+
   return (
     <Modal open onClose={onClose} title={formatLong(iso)} widthClass="max-w-md">
       <div className="space-y-4">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          Normally a{" "}
-          <span className="font-medium text-slate-700 dark:text-slate-200">
-            {defaultStatus === "OFF" ? "weekend / off" : "working"}
-          </span>{" "}
-          day.
-        </p>
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setStatus("WORKING")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-              status === "WORKING"
-                ? "border-teal-400 bg-teal-50 text-teal-700 dark:border-teal-500/40 dark:bg-teal-500/10 dark:text-teal-300"
-                : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
-            }`}
-          >
-            Working day
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatus("OFF")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
-              status === "OFF"
-                ? "border-amber-400 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
-                : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
-            }`}
-          >
-            Holiday / Off
-          </button>
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${CELL_CLASSES[override?.status ?? defaultStatus].label} ${CELL_CLASSES[override?.status ?? defaultStatus].cell}`}>
+            <CalendarDaysIcon className="h-3.5 w-3.5" /> {STATUS_LABEL[override?.status ?? defaultStatus]}
+          </span>
+          {override?.reason && <span className="text-sm text-slate-600 dark:text-slate-300">{override.reason}</span>}
         </div>
 
-        <Field label="Reason (optional)">
-          <TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Eid ul Fitr, Makeup day" />
-        </Field>
-
-        {override && (
-          <p className="text-xs text-slate-400 dark:text-slate-500">
-            Last changed{override.changedByName ? ` by ${override.changedByName}` : ""}
-            {override.changedAt ? ` on ${new Date(override.changedAt).toLocaleString()}` : ""}.
-          </p>
+        {!isPrincipal && (
+          <div className="space-y-1.5 rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Your day</p>
+            {info?.onApprovedLeave && <p className="text-sm text-blue-600 dark:text-blue-400">● You're on approved leave this day.</p>}
+            {(override?.status ?? defaultStatus) === "WORKING" && (
+              <>
+                <p className={`text-sm ${info?.diarySubmitted ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"}`}>
+                  {info?.diarySubmitted ? "✓ Diary submitted" : "— Diary not submitted yet"}
+                </p>
+                <p className={`text-sm ${info?.attendanceMarked ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400"}`}>
+                  {info?.attendanceMarked ? "✓ Attendance marked" : "— Attendance not marked yet"}
+                </p>
+              </>
+            )}
+            {!info?.onApprovedLeave && (override?.status ?? defaultStatus) !== "WORKING" && (
+              <p className="text-sm text-slate-400 dark:text-slate-500">Nothing to report — not a working day.</p>
+            )}
+          </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-slate-100 pt-4 dark:border-white/10">
-          {override ? (
-            <Button variant="ghost" size="sm" onClick={handleReset} disabled={saving}>
-              <ArrowPathIcon className="h-4 w-4" /> Reset to default
-            </Button>
-          ) : (
-            <span />
-          )}
+        <Field label="Personal note" hint="Only visible to you">
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={onClose} disabled={saving}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={handleSave} loading={saving}>
+            <TextInput value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Bring graded papers" maxLength={500} />
+            <Button size="sm" variant="secondary" onClick={handleSaveNote} loading={savingNote}>
               Save
             </Button>
           </div>
-        </div>
+        </Field>
+
+        {isPrincipal && (
+          <div className="space-y-3 border-t border-slate-100 pt-4 dark:border-white/10">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Normally a{" "}
+              <span className="font-medium text-slate-700 dark:text-slate-200">{defaultStatus === "OFF" ? "weekend / off" : "working"}</span> day.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {DAY_TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.status}
+                  type="button"
+                  onClick={() => setStatus(opt.status)}
+                  className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                    status === opt.status ? opt.activeClass : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:hover:bg-white/5"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <Field label="Reason / title (optional)">
+              <TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Eid ul Fitr, Mid-term exams, Sports day" />
+            </Field>
+
+            {override && (
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                Last changed{override.changedByName ? ` by ${override.changedByName}` : ""}
+                {override.changedAt ? ` on ${new Date(override.changedAt).toLocaleString()}` : ""}.
+              </p>
+            )}
+
+            <div className="flex items-center justify-between">
+              {override ? (
+                <Button variant="ghost" size="sm" onClick={handleReset} disabled={saving}>
+                  <ArrowPathIcon className="h-4 w-4" /> Reset to default
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={onClose} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleSave} loading={saving}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!isPrincipal && (
+          <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-white/10">
+            <Button variant="secondary" size="sm" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        )}
       </div>
     </Modal>
   );

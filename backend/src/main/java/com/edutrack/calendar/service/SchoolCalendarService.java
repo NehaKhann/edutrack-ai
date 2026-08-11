@@ -2,30 +2,41 @@ package com.edutrack.calendar.service;
 
 import com.edutrack.calendar.dto.BulkUpdateRequest;
 import com.edutrack.calendar.dto.BulkUpdateResult;
+import com.edutrack.calendar.dto.DayNoteRequest;
 import com.edutrack.calendar.dto.DayOverrideResponse;
+import com.edutrack.calendar.dto.DayStatusResponse;
 import com.edutrack.calendar.dto.MonthViewResponse;
 import com.edutrack.calendar.dto.SetDayRequest;
 import com.edutrack.calendar.entity.CalendarDayOverride;
 import com.edutrack.calendar.entity.DayStatus;
+import com.edutrack.calendar.entity.TeacherDayNote;
 import com.edutrack.calendar.repository.CalendarDayOverrideRepository;
+import com.edutrack.calendar.repository.TeacherDayNoteRepository;
 import com.edutrack.common.ApiException;
+import com.edutrack.diary.entity.DiaryEntryStatus;
+import com.edutrack.diary.repository.DiaryEntryRepository;
 import com.edutrack.org.entity.School;
 import com.edutrack.org.entity.User;
 import com.edutrack.org.repository.SchoolRepository;
 import com.edutrack.org.repository.UserRepository;
 import com.edutrack.security.AuthenticatedUser;
 import com.edutrack.security.CurrentUser;
+import com.edutrack.staffattendance.entity.LeaveStatus;
+import com.edutrack.staffattendance.repository.LeaveRequestRepository;
+import com.edutrack.staffattendance.repository.TeacherAttendanceRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +47,10 @@ public class SchoolCalendarService {
     private final SchoolRepository schoolRepository;
     private final UserRepository userRepository;
     private final CalendarDayOverrideRepository overrideRepository;
+    private final TeacherDayNoteRepository dayNoteRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
+    private final DiaryEntryRepository diaryEntryRepository;
+    private final TeacherAttendanceRecordRepository teacherAttendanceRecordRepository;
 
     @Transactional(readOnly = true)
     public boolean isNonTeachingDay(Long schoolId, LocalDate date) {
@@ -53,6 +68,74 @@ public class SchoolCalendarService {
                 .findBySchoolIdAndDateBetweenOrderByDateAsc(schoolId, ym.atDay(1), ym.atEndOfMonth())
                 .stream().map(DayOverrideResponse::from).toList();
         return new MonthViewResponse(year, month, Set.copyOf(school.getWeekendDays()), overrides);
+    }
+
+    /**
+     * Per-day grid for the current user: merges the school-wide calendar status with the
+     * caller's own approved leave, diary submission, and attendance-marked signals, plus
+     * their private note for that day. Harmless for principals — they simply won't have any
+     * diary/attendance/leave rows, so those flags are always false.
+     */
+    @Transactional(readOnly = true)
+    public List<DayStatusResponse> getDayStatusGrid(int year, int month) {
+        AuthenticatedUser currentUser = CurrentUser.get();
+        School school = schoolRepository.findById(currentUser.getSchoolId()).orElseThrow();
+        YearMonth ym = YearMonth.of(year, month);
+        LocalDate start = ym.atDay(1);
+        LocalDate end = ym.atEndOfMonth();
+        Long teacherId = currentUser.getUserId();
+
+        var overridesByDate = overrideRepository.findBySchoolIdAndDateBetweenOrderByDateAsc(school.getId(), start, end)
+                .stream().collect(Collectors.toMap(CalendarDayOverride::getDate, o -> o));
+
+        Set<LocalDate> leaveDates = leaveRequestRepository
+                .findByTeacherIdAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(teacherId, LeaveStatus.APPROVED, end, start)
+                .stream()
+                .flatMap(l -> l.getFromDate().datesUntil(l.getToDate().plusDays(1)))
+                .collect(Collectors.toSet());
+
+        Set<LocalDate> diaryDates = diaryEntryRepository.findByTeacherIdAndEntryDateBetween(teacherId, start, end)
+                .stream().filter(e -> e.getStatus() == DiaryEntryStatus.SUBMITTED)
+                .map(e -> e.getEntryDate()).collect(Collectors.toSet());
+
+        Set<LocalDate> attendanceDates = teacherAttendanceRecordRepository
+                .findByTeacherIdAndAttendanceDateBetween(teacherId, start, end)
+                .stream().map(r -> r.getAttendanceDate()).collect(Collectors.toSet());
+
+        var notesByDate = dayNoteRepository.findByTeacherIdAndDateBetween(teacherId, start, end)
+                .stream().collect(Collectors.toMap(TeacherDayNote::getDate, TeacherDayNote::getNote));
+
+        return start.datesUntil(end.plusDays(1)).map(date -> {
+            CalendarDayOverride override = overridesByDate.get(date);
+            DayStatus status = override != null ? override.getStatus() : defaultStatus(school, date);
+            return new DayStatusResponse(
+                    date,
+                    status.name(),
+                    override != null ? override.getReason() : null,
+                    school.getWeekendDays().contains(date.getDayOfWeek()),
+                    leaveDates.contains(date),
+                    diaryDates.contains(date),
+                    attendanceDates.contains(date),
+                    notesByDate.get(date)
+            );
+        }).toList();
+    }
+
+    @Transactional
+    public void saveNote(DayNoteRequest request) {
+        Long teacherId = CurrentUser.get().getUserId();
+        var existing = dayNoteRepository.findByTeacherIdAndDate(teacherId, request.date());
+
+        if (request.note() == null || request.note().isBlank()) {
+            existing.ifPresent(dayNoteRepository::delete);
+            return;
+        }
+
+        User teacher = userRepository.findById(teacherId).orElseThrow();
+        TeacherDayNote note = existing.orElseGet(() -> new TeacherDayNote(teacher, request.date(), request.note()));
+        note.setNote(request.note());
+        note.setUpdatedAt(Instant.now());
+        dayNoteRepository.save(note);
     }
 
     @Transactional
@@ -106,7 +189,7 @@ public class SchoolCalendarService {
         override.setStatus(status);
         override.setReason(reason);
         override.setChangedBy(changedBy);
-        override.setChangedAt(java.time.Instant.now());
+        override.setChangedAt(Instant.now());
         overrideRepository.save(override);
     }
 

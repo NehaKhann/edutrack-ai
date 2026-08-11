@@ -7,7 +7,7 @@ import java.time.LocalDate;
 
 public record SetDayRequest(
         @NotNull LocalDate date,
-        @NotNull @Pattern(regexp = "WORKING|OFF") String status,
+        @NotNull @Pattern(regexp = "WORKING|OFF|EXAM|EVENT") String status,
         String reason
 ) {
 }

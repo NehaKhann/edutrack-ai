@@ -7,6 +7,7 @@ const sizeClasses = {
   sm: "h-10 w-10 text-sm",
   md: "h-16 w-16 text-lg",
   lg: "h-28 w-28 text-3xl",
+  xl: "h-32 w-32 text-4xl",
 };
 
 export function ProfilePhoto({
@@ -19,7 +20,7 @@ export function ProfilePhoto({
   path: string;
   hasPhoto: boolean;
   name: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   refreshKey?: number;
 }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);

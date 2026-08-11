@@ -74,6 +74,7 @@ export default {
         "glow-brand": "0 8px 24px -6px rgba(91, 79, 239, 0.45)",
         "glow-teal": "0 8px 24px -6px rgba(31, 179, 161, 0.4)",
         "glow-coral": "0 8px 24px -6px rgba(255, 107, 85, 0.4)",
+        "glow-amber": "0 8px 24px -6px rgba(245, 158, 11, 0.4)",
         glass: "0 20px 45px -18px rgba(15, 27, 76, 0.28), 0 6px 16px -8px rgba(15, 27, 76, 0.12)",
       },
       backgroundImage: {

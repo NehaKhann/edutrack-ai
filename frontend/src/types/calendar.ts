@@ -1,6 +1,6 @@
 import type { DayOfWeek } from "./profile";
 
-export type DayStatus = "WORKING" | "OFF";
+export type DayStatus = "WORKING" | "OFF" | "EXAM" | "EVENT";
 
 export interface DayOverride {
   date: string;
@@ -15,4 +15,15 @@ export interface MonthView {
   month: number;
   weekendDays: DayOfWeek[];
   overrides: DayOverride[];
+}
+
+export interface DayStatusInfo {
+  date: string;
+  calendarStatus: DayStatus;
+  calendarReason: string | null;
+  weekend: boolean;
+  onApprovedLeave: boolean;
+  diarySubmitted: boolean;
+  attendanceMarked: boolean;
+  personalNote: string | null;
 }
