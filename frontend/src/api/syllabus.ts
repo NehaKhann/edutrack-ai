@@ -90,6 +90,14 @@ export function unconfirmSyllabus(syllabusId: number): Promise<SyllabusDto> {
   return unwrap(apiClient.post(`/api/syllabus/${syllabusId}/unconfirm`));
 }
 
+export function finalizePlanning(syllabusId: number): Promise<SyllabusDto> {
+  return unwrap(apiClient.post(`/api/syllabus/${syllabusId}/finalize-planning`));
+}
+
+export function unfinalizePlanning(syllabusId: number): Promise<SyllabusDto> {
+  return unwrap(apiClient.post(`/api/syllabus/${syllabusId}/unfinalize-planning`));
+}
+
 export function extractTopics(syllabusId: number): Promise<{ data: Topic[]; message: string | null }> {
   return unwrapWithMessage(apiClient.post(`/api/syllabus/${syllabusId}/extract-topics`));
 }
@@ -114,6 +122,10 @@ export function updateTopic(
 
 export function deleteTopic(topicId: number): Promise<void> {
   return unwrap(apiClient.delete(`/api/topics/${topicId}`));
+}
+
+export function deleteTopicsBulk(topicIds: number[]): Promise<{ deletedCount: number }> {
+  return unwrap(apiClient.post(`/api/topics/bulk-delete`, { topicIds }));
 }
 
 export function reorderTopics(syllabusId: number, topicIdsInOrder: number[]): Promise<Topic[]> {

@@ -1,6 +1,8 @@
 package com.edutrack.syllabus.controller;
 
 import com.edutrack.common.ApiResponse;
+import com.edutrack.syllabus.dto.BulkDeleteResult;
+import com.edutrack.syllabus.dto.BulkDeleteTopicsRequest;
 import com.edutrack.syllabus.dto.ReorderTopicsRequest;
 import com.edutrack.syllabus.dto.ShiftTopicDatesRequest;
 import com.edutrack.syllabus.dto.ShiftTopicDatesResult;
@@ -39,6 +41,11 @@ public class TopicController {
     public ApiResponse<Void> delete(@PathVariable Long topicId) {
         topicService.delete(topicId);
         return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/api/topics/bulk-delete")
+    public ApiResponse<BulkDeleteResult> deleteMany(@Valid @RequestBody BulkDeleteTopicsRequest request) {
+        return ApiResponse.ok(topicService.deleteMany(request.topicIds()));
     }
 
     @PostMapping("/api/syllabus/{syllabusId}/topics/reorder")

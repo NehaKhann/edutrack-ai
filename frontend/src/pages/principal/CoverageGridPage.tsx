@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowDownTrayIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
@@ -110,6 +110,7 @@ export function CoverageGridPage() {
                   <th className="px-5 py-3">Class</th>
                   <th className="px-5 py-3">Subject</th>
                   <th className="px-5 py-3">Teacher</th>
+                  <th className="px-5 py-3">Plan</th>
                   <th className="px-5 py-3">Planned to date</th>
                   <th className="px-5 py-3">Covered</th>
                   <th className="px-5 py-3">Status</th>
@@ -125,6 +126,17 @@ export function CoverageGridPage() {
                     <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">{row.classSectionName}</td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{row.subjectName}</td>
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{row.teacherName}</td>
+                    <td className="px-5 py-3">
+                      {row.planningFinalized ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20">
+                          <CheckCircleIcon className="h-3 w-3" /> Finalized
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-white/[0.08] dark:text-slate-400">
+                          Draft
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-3 tabular-nums text-slate-600 dark:text-slate-300">{row.plannedToDateCount}</td>
                     <td className="px-5 py-3 tabular-nums text-slate-600 dark:text-slate-300">{row.coveredCount}</td>
                     <td className="px-5 py-3">

@@ -1,0 +1,11 @@
+package com.edutrack.org.repository;
+
+import com.edutrack.org.entity.Student;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface StudentRepository extends JpaRepository<Student, Long> {
+    List<Student> findByClassSectionIdAndActiveTrueOrderByRollNumberAsc(Long classSectionId);
+    List<Student> findByClassSectionSchoolIdAndActiveTrue(Long schoolId);
+}

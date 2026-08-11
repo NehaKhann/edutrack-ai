@@ -261,6 +261,21 @@ public class SyllabusService {
     }
 
     @Transactional
+    public SyllabusResponse setPlanningFinalized(Long syllabusId, boolean finalized) {
+        Syllabus syllabus = getOwned(syllabusId);
+        if (finalized) {
+            if (!hasTopics(syllabusId)) {
+                throw ApiException.badRequest("Add at least one topic to the plan before finalizing it.");
+            }
+            syllabus.setPlanningFinalizedAt(Instant.now());
+        } else {
+            syllabus.setPlanningFinalizedAt(null);
+        }
+        syllabusRepository.save(syllabus);
+        return SyllabusResponse.from(syllabus, hasTopics(syllabusId));
+    }
+
+    @Transactional
     public SyllabusResponse updateMeta(Long syllabusId, String term, LocalDate termStartDate) {
         Syllabus syllabus = getOwned(syllabusId);
         syllabus.setTerm(term);

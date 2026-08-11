@@ -26,6 +26,8 @@ export interface SyllabusDto {
   confirmed: boolean;
   confirmedAt: string | null;
   hasExtractedTopics: boolean;
+  planningFinalized: boolean;
+  planningFinalizedAt: string | null;
 }
 
 export interface SyllabusDocument {
@@ -96,6 +98,7 @@ export interface CoverageGridRow {
   coveredCount: number;
   status: CoverageStatus;
   daysBehind: number | null;
+  planningFinalized: boolean;
 }
 
 export interface TopicSearchResult {

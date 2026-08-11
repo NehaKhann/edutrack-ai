@@ -10,6 +10,7 @@ public record CoverageGridRow(
         long plannedToDateCount,
         long coveredCount,
         String status,
-        Integer daysBehind
+        Integer daysBehind,
+        boolean planningFinalized
 ) {
 }

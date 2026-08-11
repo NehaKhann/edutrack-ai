@@ -16,6 +16,7 @@ import {
   PencilIcon,
   XMarkIcon,
   LockClosedIcon,
+  CheckIcon,
 } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { SubjectSelect } from "../../components/SubjectSelect";
@@ -23,6 +24,7 @@ import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Field, Select, TextInput } from "../../components/FormFields";
 import { Modal } from "../../components/Modal";
+import { ConfirmModal } from "../../components/ConfirmModal";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
@@ -541,6 +543,7 @@ function SyllabusWorkspace({
           onExtract={handleExtract}
           extracting={extracting}
           onTopicsChange={setTopics}
+          onSyllabusChange={onSyllabusChange}
           onError={(e) => setError(errorMessage(e))}
         />
       )}
@@ -1002,6 +1005,7 @@ function TopicsPanel({
   onExtract,
   extracting,
   onTopicsChange,
+  onSyllabusChange,
   onError,
 }: {
   syllabus: SyllabusDto;
@@ -1009,12 +1013,20 @@ function TopicsPanel({
   onExtract: () => void;
   extracting: boolean;
   onTopicsChange: (topics: Topic[]) => void;
+  onSyllabusChange: (s: SyllabusDto) => void;
   onError: (e: unknown) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [shifting, setShifting] = useState(false);
   const [shiftDays, setShiftDays] = useState("");
   const [applyingShift, setApplyingShift] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Topic | null>(null);
+  const [deletingSingle, setDeletingSingle] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
 
   async function handleApplyShift() {
     const days = parseInt(shiftDays, 10);
@@ -1032,13 +1044,64 @@ function TopicsPanel({
     }
   }
 
-  async function handleDelete(topicId: number) {
-    if (!confirm("Remove this topic? Any related lesson-plan history will also be removed.")) return;
+  async function confirmDeleteSingle() {
+    if (!deleteTarget) return;
+    setDeletingSingle(true);
     try {
-      await syllabusApi.deleteTopic(topicId);
-      onTopicsChange(topics.filter((t) => t.id !== topicId));
+      await syllabusApi.deleteTopic(deleteTarget.id);
+      onTopicsChange(topics.filter((t) => t.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch (e) {
       onError(e);
+    } finally {
+      setDeletingSingle(false);
+    }
+  }
+
+  function toggleSelectMode() {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(topicId: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(topicId)) next.delete(topicId);
+      else next.add(topicId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.size === topics.length ? new Set() : new Set(topics.map((t) => t.id))));
+  }
+
+  async function confirmBulkDeleteAction() {
+    setBulkDeleting(true);
+    try {
+      await syllabusApi.deleteTopicsBulk([...selectedIds]);
+      onTopicsChange(topics.filter((t) => !selectedIds.has(t.id)));
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      setConfirmBulkDelete(false);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
+  async function handleToggleFinalize() {
+    setFinalizing(true);
+    try {
+      const updated = syllabus.planningFinalized
+        ? await syllabusApi.unfinalizePlanning(syllabus.id)
+        : await syllabusApi.finalizePlanning(syllabus.id);
+      onSyllabusChange(updated);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setFinalizing(false);
     }
   }
 
@@ -1077,14 +1140,27 @@ function TopicsPanel({
 
   return (
     <Card>
-      <CardHeader className="flex items-center justify-between">
+      <CardHeader className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{syllabus.term} &mdash; Topics</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{syllabus.term} &mdash; Topics</h3>
+            {syllabus.planningFinalized && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-100 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-500/20">
+                <CheckCircleIcon className="h-3 w-3" /> Finalized
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {topics.filter((t) => t.covered).length} of {topics.length} topics covered
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {topics.length > 0 && (
+            <Button size="sm" variant="secondary" onClick={toggleSelectMode}>
+              {selectMode ? <XMarkIcon className="h-4 w-4" /> : <CheckIcon className="h-4 w-4" />}
+              {selectMode ? "Cancel" : "Select"}
+            </Button>
+          )}
           {topics.length > 0 && (
             <Button size="sm" variant="secondary" onClick={() => setShifting((v) => !v)}>
               <ArrowsRightLeftIcon className="h-4 w-4" /> Shift dates
@@ -1096,8 +1172,35 @@ function TopicsPanel({
           <Button size="sm" onClick={onExtract} loading={extracting}>
             <SparklesIcon className="h-4 w-4" /> {topics.length > 0 ? "Re-extract with AI" : "Extract with AI"}
           </Button>
+          <Button
+            size="sm"
+            variant={syllabus.planningFinalized ? "secondary" : "primary"}
+            onClick={handleToggleFinalize}
+            loading={finalizing}
+            disabled={!syllabus.planningFinalized && topics.length === 0}
+          >
+            <CheckCircleIcon className="h-4 w-4" /> {syllabus.planningFinalized ? "Un-finalize" : "Finalize Planning"}
+          </Button>
         </div>
       </CardHeader>
+      {selectMode && (
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-brand-50/60 px-4 py-3 dark:border-white/10 dark:bg-brand-500/10">
+          <button
+            onClick={toggleSelectAll}
+            className="text-xs font-semibold text-brand-700 hover:underline dark:text-brand-300"
+          >
+            {selectedIds.size === topics.length ? "Clear all" : "Select all"}
+          </button>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {selectedIds.size} of {topics.length} selected
+          </span>
+          <div className="ml-auto">
+            <Button size="sm" variant="danger" disabled={selectedIds.size === 0} onClick={() => setConfirmBulkDelete(true)}>
+              <TrashIcon className="h-4 w-4" /> Delete selected
+            </Button>
+          </div>
+        </div>
+      )}
       {shifting && (
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/5">
           <span className="text-xs text-slate-500 dark:text-slate-400">Shift every topic's dates by</span>
@@ -1139,13 +1242,40 @@ function TopicsPanel({
                 index={index}
                 total={topics.length}
                 onMove={handleMove}
-                onDelete={() => handleDelete(topic.id)}
+                onDelete={() => setDeleteTarget(topic)}
                 onSave={(values) => handleSaveEdit(topic.id, values)}
+                selectMode={selectMode}
+                selected={selectedIds.has(topic.id)}
+                onToggleSelect={() => toggleSelect(topic.id)}
               />
             ))}
           </div>
         )}
       </CardBody>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Remove topic?"
+        message={
+          <>
+            Remove <strong>{deleteTarget?.title}</strong>? Any related lesson-plan history will also be removed. This can't be undone.
+          </>
+        }
+        confirmLabel="Remove"
+        loading={deletingSingle}
+        onConfirm={confirmDeleteSingle}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmModal
+        open={confirmBulkDelete}
+        title={`Remove ${selectedIds.size} topic${selectedIds.size === 1 ? "" : "s"}?`}
+        message="Any related lesson-plan history for these topics will also be removed. This can't be undone."
+        confirmLabel="Remove all"
+        loading={bulkDeleting}
+        onConfirm={confirmBulkDeleteAction}
+        onCancel={() => setConfirmBulkDelete(false)}
+      />
     </Card>
   );
 }
@@ -1165,6 +1295,9 @@ function TopicRow({
   onMove,
   onDelete,
   onSave,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
 }: {
   topic: Topic;
   index: number;
@@ -1172,6 +1305,9 @@ function TopicRow({
   onMove: (index: number, dir: -1 | 1) => void;
   onDelete: () => void;
   onSave: (values: TopicFormValues) => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -1189,10 +1325,36 @@ function TopicRow({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-transparent px-2.5 py-3 transition-colors hover:border-slate-200/70 hover:bg-slate-50/70 dark:hover:border-white/10 dark:hover:bg-white/5">
+    <div
+      onClick={selectMode ? onToggleSelect : undefined}
+      className={clsx(
+        "flex items-start gap-3 rounded-xl border px-2.5 py-3 transition-colors",
+        selectMode && "cursor-pointer",
+        selectMode && selected
+          ? "border-brand-200 bg-brand-50/60 dark:border-brand-400/30 dark:bg-brand-500/10"
+          : "border-transparent hover:border-slate-200/70 hover:bg-slate-50/70 dark:hover:border-white/10 dark:hover:bg-white/5"
+      )}
+    >
+      {selectMode && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect?.();
+          }}
+          aria-label={selected ? "Deselect topic" : "Select topic"}
+          className={clsx(
+            "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+            selected
+              ? "border-brand-600 bg-brand-600 text-white"
+              : "border-slate-300 bg-white text-transparent hover:border-brand-400 dark:border-white/20 dark:bg-white/5"
+          )}
+        >
+          <CheckIcon className="h-3.5 w-3.5" />
+        </button>
+      )}
       <div className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/5">
         <button
-          disabled={index === 0}
+          disabled={index === 0 || selectMode}
           onClick={() => onMove(index, -1)}
           className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
           aria-label="Move up"
@@ -1201,7 +1363,7 @@ function TopicRow({
         </button>
         <div className="h-px bg-slate-200 dark:bg-white/10" />
         <button
-          disabled={index === total - 1}
+          disabled={index === total - 1 || selectMode}
           onClick={() => onMove(index, 1)}
           className="px-1.5 py-1 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 disabled:pointer-events-none disabled:opacity-30 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
           aria-label="Move down"
@@ -1230,22 +1392,24 @@ function TopicRow({
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
-        <button
-          onClick={() => setEditing(true)}
-          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
-          aria-label="Edit topic"
-        >
-          <PencilSquareIcon className="h-4 w-4" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-coral-50 hover:text-coral-600 dark:text-slate-500 dark:hover:bg-coral-500/15 dark:hover:text-coral-400"
-          aria-label="Delete topic"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
-      </div>
+      {!selectMode && (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setEditing(true)}
+            className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:text-slate-500 dark:hover:bg-brand-500/15 dark:hover:text-brand-300"
+            aria-label="Edit topic"
+          >
+            <PencilSquareIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-coral-50 hover:text-coral-600 dark:text-slate-500 dark:hover:bg-coral-500/15 dark:hover:text-coral-400"
+            aria-label="Delete topic"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

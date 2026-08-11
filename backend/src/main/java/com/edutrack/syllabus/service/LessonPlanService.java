@@ -67,7 +67,9 @@ public class LessonPlanService {
     }
 
     private Topic suggestNextTopic(Long subjectId, LocalDate date) {
-        List<Topic> topics = topicRepository.findBySyllabusSubjectIdOrderByOrderIndexAsc(subjectId);
+        List<Topic> topics = topicRepository.findBySyllabusSubjectIdOrderByOrderIndexAsc(subjectId).stream()
+                .filter(t -> t.getSyllabus().isPlanningFinalized())
+                .toList();
         return topics.stream()
                 .filter(t -> !t.isCovered())
                 .filter(t -> !t.getPlannedStartDate().isAfter(date))

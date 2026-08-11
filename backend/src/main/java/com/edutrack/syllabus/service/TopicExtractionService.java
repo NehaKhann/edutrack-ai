@@ -126,9 +126,11 @@ public class TopicExtractionService {
 
             if (month != null) {
                 YearMonth termMonth = YearMonth.from(syllabus.getTermStartDate());
-                if (Math.abs(Period.between(termMonth.atDay(1), month.atDay(1)).toTotalMonths()) > MAX_REASONABLE_MONTH_DISTANCE) {
-                    log.warn("Clamping unreasonable month '{}' for topic '{}' relative to term start {}",
-                            month, title, syllabus.getTermStartDate());
+                boolean beforeTermStart = month.isBefore(termMonth);
+                boolean tooFarAway = Math.abs(Period.between(termMonth.atDay(1), month.atDay(1)).toTotalMonths()) > MAX_REASONABLE_MONTH_DISTANCE;
+                if (beforeTermStart || tooFarAway) {
+                    log.warn("Clamping month '{}' for topic '{}' relative to term start {} ({})",
+                            month, title, syllabus.getTermStartDate(), beforeTermStart ? "before term start" : "too far away");
                     month = termMonth;
                     adjusted = true;
                 }

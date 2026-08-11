@@ -15,6 +15,9 @@ import {
   Bars3Icon,
   XMarkIcon,
   BellIcon,
+  PencilSquareIcon,
+  ClipboardDocumentCheckIcon,
+  IdentificationIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../auth/AuthContext";
 import { AmbientBackground } from "../components/AmbientBackground";
@@ -23,6 +26,9 @@ import { ThemeToggle } from "../components/ThemeToggle";
 const teacherNav = [
   { to: "/teacher/lesson-plan", label: "Today's Plan", icon: CalendarDaysIcon },
   { to: "/teacher/syllabus", label: "Syllabus", icon: BookOpenIcon },
+  { to: "/teacher/diary", label: "Class Diary", icon: PencilSquareIcon },
+  { to: "/teacher/attendance", label: "Attendance", icon: ClipboardDocumentCheckIcon },
+  { to: "/teacher/my-attendance", label: "My Attendance & Leave", icon: IdentificationIcon },
   { to: "/search", label: "Search", icon: MagnifyingGlassIcon },
   { to: "/teacher/profile", label: "My Profile", icon: UserCircleIcon },
   { to: "/calendar", label: "Calendar", icon: CalendarIcon },
@@ -30,6 +36,9 @@ const teacherNav = [
 
 const principalNav = [
   { to: "/principal/coverage", label: "Coverage Grid", icon: Squares2X2Icon },
+  { to: "/principal/diary", label: "Class Diary", icon: PencilSquareIcon },
+  { to: "/principal/attendance", label: "Attendance", icon: ClipboardDocumentCheckIcon },
+  { to: "/principal/teacher-attendance", label: "Teacher Attendance", icon: IdentificationIcon },
   { to: "/principal/teachers", label: "Teacher Directory", icon: UsersIcon },
   { to: "/search", label: "Search", icon: MagnifyingGlassIcon },
   { to: "/calendar", label: "Calendar", icon: CalendarIcon },

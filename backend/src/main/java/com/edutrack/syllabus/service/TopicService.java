@@ -4,6 +4,7 @@ import com.edutrack.common.ApiException;
 import com.edutrack.org.entity.Role;
 import com.edutrack.security.AuthenticatedUser;
 import com.edutrack.security.CurrentUser;
+import com.edutrack.syllabus.dto.BulkDeleteResult;
 import com.edutrack.syllabus.dto.ShiftTopicDatesResult;
 import com.edutrack.syllabus.dto.TopicResponse;
 import com.edutrack.syllabus.dto.TopicSearchResult;
@@ -55,6 +56,13 @@ public class TopicService {
     public void delete(Long topicId) {
         Topic topic = getOwned(topicId);
         topicRepository.delete(topic);
+    }
+
+    @Transactional
+    public BulkDeleteResult deleteMany(List<Long> topicIds) {
+        List<Topic> topics = topicIds.stream().map(this::getOwned).toList();
+        topicRepository.deleteAll(topics);
+        return new BulkDeleteResult(topics.size());
     }
 
     @Transactional

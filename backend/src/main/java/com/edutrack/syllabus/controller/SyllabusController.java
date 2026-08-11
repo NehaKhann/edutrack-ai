@@ -101,6 +101,16 @@ public class SyllabusController {
         return ApiResponse.ok(syllabusService.unconfirm(id));
     }
 
+    @PostMapping("/{id}/finalize-planning")
+    public ApiResponse<SyllabusResponse> finalizePlanning(@PathVariable Long id) {
+        return ApiResponse.ok(syllabusService.setPlanningFinalized(id, true));
+    }
+
+    @PostMapping("/{id}/unfinalize-planning")
+    public ApiResponse<SyllabusResponse> unfinalizePlanning(@PathVariable Long id) {
+        return ApiResponse.ok(syllabusService.setPlanningFinalized(id, false));
+    }
+
     @PostMapping("/{id}/extract-topics")
     public ApiResponse<List<TopicResponse>> extractTopics(@PathVariable Long id) {
         Syllabus syllabus = syllabusService.getOwned(id);

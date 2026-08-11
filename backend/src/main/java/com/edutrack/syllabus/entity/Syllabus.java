@@ -36,6 +36,9 @@ public class Syllabus {
     @Column(name = "confirmed_at")
     private Instant confirmedAt;
 
+    @Column(name = "planning_finalized_at")
+    private Instant planningFinalizedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -43,5 +46,9 @@ public class Syllabus {
         this.subject = subject;
         this.term = term;
         this.termStartDate = termStartDate;
+    }
+
+    public boolean isPlanningFinalized() {
+        return planningFinalizedAt != null;
     }
 }

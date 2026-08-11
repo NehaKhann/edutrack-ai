@@ -150,7 +150,7 @@ export function CalendarPage() {
       {isPrincipal && <div className="mb-5"><WeekendDaysCard onError={(e) => setError(errorMessage(e))} /></div>}
 
       <Card>
-        <CardHeader className="flex items-center justify-between">
+        <CardHeader className="flex flex-wrap items-center justify-between gap-y-2">
           <div className="flex items-center gap-3">
             <button
               onClick={() => goToMonth(-1)}
@@ -168,7 +168,7 @@ export function CalendarPage() {
               <ChevronRightIcon className="h-5 w-5" />
             </button>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
             <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-500" /> Weekend</span>
             <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Off</span>
             <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-teal-400" /> Extra working</span>

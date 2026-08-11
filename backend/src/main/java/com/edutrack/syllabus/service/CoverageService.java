@@ -14,6 +14,7 @@ import com.edutrack.syllabus.dto.TopicResponse;
 import com.edutrack.syllabus.entity.LessonPlanStatus;
 import com.edutrack.syllabus.entity.Topic;
 import com.edutrack.syllabus.repository.LessonPlanEntryRepository;
+import com.edutrack.syllabus.repository.SyllabusRepository;
 import com.edutrack.syllabus.repository.TopicRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class CoverageService {
     private final LessonPlanEntryRepository lessonPlanEntryRepository;
     private final SchoolRepository schoolRepository;
     private final PdfService pdfService;
+    private final SyllabusRepository syllabusRepository;
 
     @Transactional(readOnly = true)
     public List<CoverageGridRow> getCoverageGrid() {
@@ -70,11 +72,15 @@ public class CoverageService {
                     .orElse(null);
         }
 
+        boolean planningFinalized = syllabusRepository.findFirstBySubjectIdOrderByCreatedAtDesc(subject.getId())
+                .map(s -> s.isPlanningFinalized())
+                .orElse(false);
+
         return new CoverageGridRow(
                 subject.getClassSection().getId(), subject.getClassSection().getName(),
                 subject.getId(), subject.getName(),
                 subject.getTeacher().getId(), subject.getTeacher().getName(),
-                plannedToDate, covered, status, daysBehind
+                plannedToDate, covered, status, daysBehind, planningFinalized
         );
     }
 
