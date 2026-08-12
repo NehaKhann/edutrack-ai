@@ -11,10 +11,13 @@ import { Spinner } from "../../components/Spinner";
 import { Modal } from "../../components/Modal";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { StatCard } from "../../components/StatCard";
+import { PercentBarChart, StatusDonutChart, TrendLineChart } from "../../components/Charts";
 import * as attendanceApi from "../../api/attendance";
 import * as studentsApi from "../../api/students";
 import { listClassSections } from "../../api/classSections";
 import { errorMessage } from "../../api/client";
+import { formatDate } from "../../utils/date";
 import type { ClassSectionSummary, Student } from "../../types/roster";
 import type { ClassAttendanceSummary, StudentAttendanceRow } from "../../types/attendance";
 
@@ -32,6 +35,8 @@ export function AttendanceDashboardPage() {
   const [detailFor, setDetailFor] = useState<ClassAttendanceSummary | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
 
+  const [trend, setTrend] = useState<{ label: string; value: number }[]>([]);
+
   useEffect(() => {
     setLoading(true);
     attendanceApi
@@ -40,6 +45,24 @@ export function AttendanceDashboardPage() {
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
   }, [date]);
+
+  useEffect(() => {
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().slice(0, 10);
+    });
+    Promise.all(days.map((d) => attendanceApi.getAttendanceSummary(d).catch(() => [] as ClassAttendanceSummary[]))).then((results) => {
+      setTrend(
+        results.map((rows, i) => {
+          const total = rows.reduce((sum, r) => sum + r.total, 0);
+          const present = rows.reduce((sum, r) => sum + r.present, 0);
+          const pct = total === 0 ? 0 : Math.round((present / total) * 1000) / 10;
+          return { label: new Date(days[i]).toLocaleDateString(undefined, { weekday: "short" }), value: pct };
+        })
+      );
+    });
+  }, []);
 
   const totalClasses = summary.length;
   const completed = summary.filter((s) => s.completed).length;
@@ -73,33 +96,13 @@ export function AttendanceDashboardPage() {
       )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card>
-          <CardBody>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">📚 Total Classes</p>
-            <p className="mt-1.5 text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{totalClasses}</p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">✅ Overall Attendance</p>
-            <p className="mt-1.5 text-2xl font-bold tabular-nums text-teal-600 dark:text-teal-400">{overallPct}%</p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">☑️ Completed</p>
-            <p className="mt-1.5 text-2xl font-bold tabular-nums text-teal-600 dark:text-teal-400">{completed}</p>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardBody>
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">⚠️ Not Marked</p>
-            <p className="mt-1.5 text-2xl font-bold tabular-nums text-coral-600 dark:text-coral-400">{notMarked}</p>
-          </CardBody>
-        </Card>
+        <StatCard icon="📚" label="Total Classes" value={totalClasses} />
+        <StatCard icon="✅" label="Overall Attendance" value={`${overallPct}%`} tone="teal" />
+        <StatCard icon="☑️" label="Completed" value={completed} tone="teal" />
+        <StatCard icon="⚠️" label="Not Marked" value={notMarked} tone="coral" />
       </div>
 
-      <Card>
+      <Card className="mb-4">
         <CardBody className="flex flex-wrap items-end gap-3">
           <Field label="Date">
             <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
@@ -129,9 +132,46 @@ export function AttendanceDashboardPage() {
         </CardBody>
       </Card>
 
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Attendance % by Class</h3>
+          </CardHeader>
+          <CardBody>
+            <PercentBarChart
+              data={summary.filter((s) => s.completed).map((s) => ({ name: s.classSectionName, value: s.attendancePercent }))}
+              valueLabel="Attendance"
+              emptyMessage="No classes marked yet for this date."
+            />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Present / Absent / Late — {formatDate(date)}</h3>
+          </CardHeader>
+          <CardBody>
+            <StatusDonutChart
+              present={summary.reduce((sum, s) => sum + s.present, 0)}
+              absent={summary.reduce((sum, s) => sum + s.absent, 0)}
+              late={summary.reduce((sum, s) => sum + s.late, 0)}
+              emptyMessage="No attendance marked yet for this date."
+            />
+          </CardBody>
+        </Card>
+      </div>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Last 7 Days — Attendance Trend</h3>
+        </CardHeader>
+        <CardBody>
+          <TrendLineChart data={trend} emptyMessage="Not enough attendance history yet." />
+        </CardBody>
+      </Card>
+
       <Card className="overflow-hidden">
         <CardHeader>
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">All Classes — {date}</h3>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">All Classes — {formatDate(date)}</h3>
         </CardHeader>
         {loading ? (
           <div className="flex justify-center py-8">
@@ -235,7 +275,7 @@ function AttendanceDetailModal({
 
   return (
     <Modal open onClose={onClose} title={`${summary.classSectionName} — Attendance`} widthClass="max-w-lg">
-      <p className="-mt-2 mb-3 text-xs text-slate-500 dark:text-slate-400">{date}</p>
+      <p className="-mt-2 mb-3 text-xs text-slate-500 dark:text-slate-400">{formatDate(date)}</p>
       <div className="mb-3 flex flex-wrap gap-3 text-[11px] font-semibold">
         <span className="text-teal-600 dark:text-teal-400">Present {summary.present}</span>
         <span className="text-coral-600 dark:text-coral-400">Absent {summary.absent}</span>

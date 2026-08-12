@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { ExclamationTriangleIcon, CheckCircleIcon, CalendarDaysIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardHeader } from "../../components/Card";
@@ -9,6 +9,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
 import { Modal } from "../../components/Modal";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
+import { StatCard } from "../../components/StatCard";
 import * as staffApi from "../../api/staffAttendance";
 import { errorMessage } from "../../api/client";
 import { formatDate } from "../../utils/date";
@@ -48,6 +49,7 @@ export function TeacherAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTeacherId, setSelectedTeacherId] = useState<number | null>(null);
+  const [filter, setFilter] = useState<"all" | "not_marked" | "on_leave" | "skipped">("all");
 
   useEffect(() => {
     load();
@@ -65,6 +67,18 @@ export function TeacherAttendancePage() {
   const absentWithoutLeave = rows.filter((r) => r.absentWithoutLeave);
   const skippedNoReason = rows.filter((r) => r.skippedPeriodsCount > 0);
 
+  const presentCount = rows.filter((r) => r.status === "PRESENT").length;
+  const onLeaveCount = rows.filter((r) => r.status === "ON_LEAVE").length;
+  const notMarkedCount = rows.filter((r) => r.status === null).length;
+  const skippedTotal = rows.reduce((sum, r) => sum + r.skippedPeriodsCount, 0);
+
+  const filteredRows = rows.filter((r) => {
+    if (filter === "not_marked") return r.status === null;
+    if (filter === "on_leave") return r.status === "ON_LEAVE";
+    if (filter === "skipped") return r.skippedPeriodsCount > 0;
+    return true;
+  });
+
   return (
     <div>
       <PageHeader title="Teacher Attendance" description="Today's staff attendance, leave requests, and class-skip reports." />
@@ -74,6 +88,18 @@ export function TeacherAttendancePage() {
           <Alert type="error">{error}</Alert>
         </div>
       )}
+
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard icon={<CheckCircleIcon className="h-3.5 w-3.5" />} label="Present Today" value={presentCount} tone="teal" />
+        <StatCard icon={<CalendarDaysIcon className="h-3.5 w-3.5" />} label="On Leave" value={onLeaveCount} tone="brand" />
+        <StatCard icon={<ExclamationTriangleIcon className="h-3.5 w-3.5" />} label="Not Marked" value={notMarkedCount} tone="coral" />
+        <StatCard
+          icon={<DocumentTextIcon className="h-3.5 w-3.5" />}
+          label="Classes Skipped Today"
+          value={skippedTotal}
+          tone={skippedTotal > 0 ? "coral" : "default"}
+        />
+      </div>
 
       {!loading && (absentWithoutLeave.length > 0 || skippedNoReason.length > 0) && (
         <div className="mb-4">
@@ -98,8 +124,31 @@ export function TeacherAttendancePage() {
       )}
 
       <Card className="overflow-hidden">
-        <CardHeader>
+        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Today — {formatDate(new Date().toISOString().slice(0, 10))}</h3>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                { value: "all", label: "All" },
+                { value: "not_marked", label: "Not Marked" },
+                { value: "on_leave", label: "On Leave" },
+                { value: "skipped", label: "Has Skipped Classes" },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value)}
+                className={clsx(
+                  "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                  filter === f.value
+                    ? "border-transparent bg-brand-600 text-white"
+                    : "border-slate-300 bg-white/80 text-slate-600 hover:border-brand-400 dark:border-white/15 dark:bg-white/5 dark:text-slate-300"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
         </CardHeader>
         {loading ? (
           <div className="flex justify-center py-8">
@@ -108,6 +157,10 @@ export function TeacherAttendancePage() {
         ) : rows.length === 0 ? (
           <div className="p-6">
             <EmptyState title="No teachers yet" description="Teacher accounts will appear here once provisioned." />
+          </div>
+        ) : filteredRows.length === 0 ? (
+          <div className="p-6">
+            <EmptyState title="No teachers match" description="Try a different quick filter." />
           </div>
         ) : (
           <ResponsiveTable>
@@ -122,7 +175,7 @@ export function TeacherAttendancePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/[0.08]">
-                {rows.map((r) => (
+                {filteredRows.map((r) => (
                   <tr key={r.teacherId} className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5" onClick={() => setSelectedTeacherId(r.teacherId)}>
                     <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">{r.teacherName}</td>
                     <td className="px-5 py-3">
@@ -139,8 +192,8 @@ export function TeacherAttendancePage() {
                     <td className="px-5 py-3 text-slate-600 dark:text-slate-300">{r.leaveReason ?? "—"}</td>
                     <td className="px-5 py-3">
                       {r.skippedPeriodsCount > 0 ? (
-                        <span className="inline-flex items-center rounded-full bg-coral-50 px-2.5 py-0.5 text-[11px] font-semibold text-coral-700 ring-1 ring-inset ring-coral-100 dark:bg-coral-500/10 dark:text-coral-300 dark:ring-coral-500/20">
-                          {r.skippedPeriodsCount}
+                        <span className="inline-flex items-center gap-1 rounded-full bg-coral-100 px-2.5 py-0.5 text-[11px] font-bold text-coral-700 ring-1 ring-inset ring-coral-200 dark:bg-coral-500/20 dark:text-coral-300 dark:ring-coral-500/30">
+                          <ExclamationTriangleIcon className="h-3 w-3" /> {r.skippedPeriodsCount}
                         </span>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-white/[0.08] dark:text-slate-400">0</span>
@@ -242,7 +295,7 @@ function TeacherDetailModal({ teacherId, onClose, onReviewed }: { teacherId: num
 
           {detail.skippedClasses.length > 0 && (
             <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Skipped Classes</h4>
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Today's Skipped Classes</h4>
               <div className="space-y-2">
                 {detail.skippedClasses.map((s) => (
                   <div key={s.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-white/10 dark:bg-white/5">
@@ -287,13 +340,16 @@ function TeacherDetailModal({ teacherId, onClose, onReviewed }: { teacherId: num
             ) : (
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 dark:divide-white/[0.08] dark:border-white/10">
                 {detail.leaveHistory.map((l) => (
-                  <div key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                    <div>
-                      <span className="font-medium text-slate-700 dark:text-slate-200">{l.leaveType}</span>{" "}
-                      <span className="text-slate-500 dark:text-slate-400">
-                        {formatDate(l.fromDate)}
-                        {l.toDate !== l.fromDate ? ` – ${formatDate(l.toDate)}` : ""}
-                      </span>
+                  <div key={l.id} className="flex items-start justify-between gap-3 px-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <div>
+                        <span className="font-medium text-slate-700 dark:text-slate-200">{l.leaveType}</span>{" "}
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {formatDate(l.fromDate)}
+                          {l.toDate !== l.fromDate ? ` – ${formatDate(l.toDate)}` : ""}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">{l.reason}</p>
                     </div>
                     <StatusBadgeLeave status={l.status} />
                   </div>

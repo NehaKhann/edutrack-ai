@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { ArrowDownTrayIcon, ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, ExclamationTriangleIcon, CheckCircleIcon, AcademicCapIcon, ClockIcon } from "@heroicons/react/24/outline";
+import clsx from "clsx";
 import { PageHeader } from "../../components/PageHeader";
-import { Card } from "../../components/Card";
+import { Card, CardHeader, CardBody } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
 import { SkeletonRows } from "../../components/Skeleton";
 import { StatusBadge } from "../../components/Badge";
+import { StatCard } from "../../components/StatCard";
+import { PercentBarChart } from "../../components/Charts";
 import { Modal } from "../../components/Modal";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
 import * as coverageApi from "../../api/coverage";
@@ -27,6 +30,29 @@ export function CoverageGridPage() {
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const chronicRows = rows.filter((r) => (r.daysBehind ?? 0) >= CHRONIC_THRESHOLD_DAYS);
+
+  const onTrackCount = rows.filter((r) => r.status === "ON_TRACK" || r.status === "AHEAD").length;
+  const behindCount = rows.filter((r) => r.status === "BEHIND").length;
+  const notStartedCount = rows.filter((r) => r.status === "NOT_STARTED").length;
+
+  const classCoverage = new Map<string, { planned: number; covered: number }>();
+  for (const r of rows) {
+    const cur = classCoverage.get(r.classSectionName) ?? { planned: 0, covered: 0 };
+    cur.planned += r.plannedToDateCount;
+    cur.covered += r.coveredCount;
+    classCoverage.set(r.classSectionName, cur);
+  }
+  const classCoverageData = Array.from(classCoverage.entries()).map(([name, v]) => ({
+    name,
+    value: v.planned === 0 ? 0 : Math.min(100, Math.round((v.covered / v.planned) * 100)),
+  }));
+
+  const rowAccent: Record<CoverageGridRow["status"], string> = {
+    ON_TRACK: "border-l-teal-400",
+    AHEAD: "border-l-brand-400",
+    BEHIND: "border-l-coral-400",
+    NOT_STARTED: "border-l-transparent",
+  };
 
   useEffect(() => {
     coverageApi
@@ -77,6 +103,13 @@ export function CoverageGridPage() {
         </div>
       )}
 
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard icon={<AcademicCapIcon className="h-3.5 w-3.5" />} label="Total Subjects" value={rows.length} />
+        <StatCard icon={<CheckCircleIcon className="h-3.5 w-3.5" />} label="On Track" value={onTrackCount} tone="teal" />
+        <StatCard icon={<ExclamationTriangleIcon className="h-3.5 w-3.5" />} label="Behind Schedule" value={behindCount} tone="coral" />
+        <StatCard icon={<ClockIcon className="h-3.5 w-3.5" />} label="Not Started" value={notStartedCount} tone="default" />
+      </div>
+
       {!bannerDismissed && chronicRows.length > 0 && (
         <div className="mb-4">
           <Alert type="warning">
@@ -102,7 +135,17 @@ export function CoverageGridPage() {
       ) : rows.length === 0 ? (
         <EmptyState title="No subjects yet" description="Once subjects and syllabi are set up, coverage will appear here." />
       ) : (
-        <Card className="overflow-hidden">
+        <>
+          <Card className="mb-4">
+            <CardHeader>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Coverage Progress by Class</h3>
+            </CardHeader>
+            <CardBody>
+              <PercentBarChart data={classCoverageData} valueLabel="Coverage" emptyMessage="No coverage data yet." />
+            </CardBody>
+          </Card>
+
+          <Card className="overflow-hidden">
           <ResponsiveTable>
             <table className="w-full min-w-[640px] text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-400">
@@ -120,7 +163,10 @@ export function CoverageGridPage() {
                 {rows.map((row) => (
                   <tr
                     key={row.subjectId}
-                    className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                    className={clsx(
+                      "cursor-pointer border-l-4 transition-colors hover:bg-slate-50 dark:hover:bg-white/5",
+                      rowAccent[row.status]
+                    )}
                     onClick={() => openDetail(row.subjectId)}
                   >
                     <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">{row.classSectionName}</td>
@@ -138,7 +184,19 @@ export function CoverageGridPage() {
                       )}
                     </td>
                     <td className="px-5 py-3 tabular-nums text-slate-600 dark:text-slate-300">{row.plannedToDateCount}</td>
-                    <td className="px-5 py-3 tabular-nums text-slate-600 dark:text-slate-300">{row.coveredCount}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="tabular-nums text-slate-600 dark:text-slate-300">{row.coveredCount}</span>
+                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
+                          <div
+                            className={clsx("h-full rounded-full", row.status === "BEHIND" ? "bg-coral-400" : "bg-teal-500")}
+                            style={{
+                              width: `${row.plannedToDateCount === 0 ? 0 : Math.min(100, Math.round((row.coveredCount / row.plannedToDateCount) * 100))}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
                         <StatusBadge status={row.status} />
@@ -157,7 +215,8 @@ export function CoverageGridPage() {
               </tbody>
             </table>
           </ResponsiveTable>
-        </Card>
+          </Card>
+        </>
       )}
 
       <Modal open={!!detail || detailLoading} onClose={() => setDetail(null)} title={detail?.subjectName ?? "Loading..."}>
