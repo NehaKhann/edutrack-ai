@@ -34,14 +34,14 @@ public class StudentService {
 
     @Transactional
     public StudentResponse create(Long classSectionId, StudentUpsertRequest request) {
-        ClassSection classSection = getOwnedByPrincipal(classSectionId);
+        ClassSection classSection = getAccessible(classSectionId);
         Student student = new Student(classSection, request.name(), request.rollNumber());
         return StudentResponse.from(studentRepository.save(student));
     }
 
     @Transactional
     public StudentResponse update(Long studentId, StudentUpsertRequest request) {
-        Student student = getOwnedStudentByPrincipal(studentId);
+        Student student = getAccessibleStudent(studentId);
         student.setName(request.name());
         student.setRollNumber(request.rollNumber());
         return StudentResponse.from(studentRepository.save(student));
@@ -49,7 +49,7 @@ public class StudentService {
 
     @Transactional
     public void deactivate(Long studentId) {
-        Student student = getOwnedStudentByPrincipal(studentId);
+        Student student = getAccessibleStudent(studentId);
         student.setActive(false);
         studentRepository.save(student);
     }
@@ -68,30 +68,10 @@ public class StudentService {
         return classSection;
     }
 
-    private ClassSection getOwnedByPrincipal(Long classSectionId) {
-        assertPrincipal();
-        ClassSection classSection = classSectionRepository.findById(classSectionId)
-                .orElseThrow(() -> ApiException.notFound("Class not found"));
-        if (!classSection.getSchool().getId().equals(CurrentUser.get().getSchoolId())) {
-            throw ApiException.notFound("Class not found");
-        }
-        return classSection;
-    }
-
-    private Student getOwnedStudentByPrincipal(Long studentId) {
-        assertPrincipal();
+    private Student getAccessibleStudent(Long studentId) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> ApiException.notFound("Student not found"));
-        if (!student.getClassSection().getSchool().getId().equals(CurrentUser.get().getSchoolId())) {
-            throw ApiException.notFound("Student not found");
-        }
+        getAccessible(student.getClassSection().getId());
         return student;
-    }
-
-    private void assertPrincipal() {
-        Role role = CurrentUser.get().getRole();
-        if (role != Role.PRINCIPAL && role != Role.ADMIN) {
-            throw ApiException.forbidden("Only a Principal can manage students");
-        }
     }
 }

@@ -20,6 +20,8 @@ import {
   MagnifyingGlassIcon,
   ExclamationTriangleIcon,
   BookOpenIcon,
+  MagnifyingGlassPlusIcon,
+  MagnifyingGlassMinusIcon,
 } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { SubjectSelect } from "../../components/SubjectSelect";
@@ -650,6 +652,8 @@ function DocumentsPanel({
   const [showManual, setShowManual] = useState(false);
   const [manualText, setManualText] = useState("");
   const [addingManual, setAddingManual] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<SyllabusDocument | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleSaveText(documentId: number, text: string) {
     try {
@@ -660,13 +664,17 @@ function DocumentsPanel({
     }
   }
 
-  async function handleDelete(documentId: number) {
-    if (!confirm("Remove this document from the syllabus?")) return;
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await syllabusApi.deleteDocument(documentId);
-      onDocumentsChange(documents.filter((d) => d.id !== documentId));
+      await syllabusApi.deleteDocument(deleteTarget.id);
+      onDocumentsChange(documents.filter((d) => d.id !== deleteTarget.id));
+      setDeleteTarget(null);
     } catch (e) {
       onError(e);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -759,7 +767,7 @@ function DocumentsPanel({
             document={doc}
             readOnly={syllabus.confirmed}
             onSave={(text) => handleSaveText(doc.id, text)}
-            onDelete={() => handleDelete(doc.id)}
+            onDelete={() => setDeleteTarget(doc)}
           />
         ))
       )}
@@ -801,6 +809,21 @@ function DocumentsPanel({
           </Button>
         </>
       )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Remove this document?"
+        message={
+          <>
+            Remove <strong>{deleteTarget?.originalFilename}</strong> from this syllabus? Its extracted text and preview will be
+            deleted along with it. This can't be undone.
+          </>
+        }
+        confirmLabel="Remove"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
@@ -824,11 +847,20 @@ function ConfidenceBadge({ confidence, isManual }: { confidence: number | null; 
   return <span className={clsx("rounded-full px-2 py-0.5 text-[11px] font-semibold", colorClass)}>{rounded}% confidence</span>;
 }
 
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.25;
+
 function DocumentPreviewPane({ documentId }: { documentId: number }) {
   const [info, setInfo] = useState<DocumentPreviewInfo | null>(null);
   const [page, setPage] = useState(1);
   const [imgUrl, setImgUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    setZoom(1);
+  }, [documentId, page]);
 
   useEffect(() => {
     let alive = true;
@@ -888,16 +920,51 @@ function DocumentPreviewPane({ documentId }: { documentId: number }) {
   return (
     <div className="flex flex-col items-center gap-2">
       {imgUrl ? (
-        <img
-          src={imgUrl}
-          alt="Original scan"
-          className="max-h-72 w-full rounded-lg border border-slate-200 object-contain dark:border-white/10"
-        />
+        <div className="h-72 w-full overflow-auto rounded-lg border border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
+          <div className="flex min-h-full items-center justify-center">
+            <img
+              src={imgUrl}
+              alt="Original scan"
+              style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}
+              className="max-h-72 max-w-full object-contain transition-transform duration-150"
+            />
+          </div>
+        </div>
       ) : (
         <div className="flex h-56 w-full items-center justify-center rounded-lg bg-slate-50 dark:bg-white/5">
           <Spinner className="h-5 w-5" />
         </div>
       )}
+
+      {imgUrl && (
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+          <button
+            onClick={() => setZoom((z) => Math.max(ZOOM_MIN, +(z - ZOOM_STEP).toFixed(2)))}
+            disabled={zoom <= ZOOM_MIN}
+            aria-label="Zoom out"
+            className="rounded-md p-1 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-white/10"
+          >
+            <MagnifyingGlassMinusIcon className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setZoom(1)}
+            disabled={zoom === 1}
+            className="w-11 rounded-md py-0.5 text-center tabular-nums transition-colors hover:bg-slate-100 disabled:pointer-events-none dark:hover:bg-white/10"
+            title="Reset zoom"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            onClick={() => setZoom((z) => Math.min(ZOOM_MAX, +(z + ZOOM_STEP).toFixed(2)))}
+            disabled={zoom >= ZOOM_MAX}
+            aria-label="Zoom in"
+            className="rounded-md p-1 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-30 dark:hover:bg-white/10"
+          >
+            <MagnifyingGlassPlusIcon className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {info.type === "PDF" && info.pageCount > 1 && (
         <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
           <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="disabled:opacity-30">
@@ -956,17 +1023,6 @@ function DocumentCard({
         )}
       </CardHeader>
       <CardBody className="space-y-3">
-        {document.lowConfidenceWords.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-medium text-slate-500 dark:text-slate-400">Check:</span>
-            {document.lowConfidenceWords.map((w, i) => (
-              <span key={i} className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
-                {w}
-              </span>
-            ))}
-          </div>
-        )}
-
         {lowQuality && !readOnly && (
           <Alert type="warning">
             Extraction quality looks low{(document.ocrLanguage ?? "").includes("urd") ? " for this Urdu scan" : ""} — try a

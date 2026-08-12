@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircleIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, UsersIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
@@ -9,11 +9,15 @@ import { SkeletonRows } from "../../components/Skeleton";
 import { Toast } from "../../components/Toast";
 import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
 import { ClassSectionPicker } from "../../components/ClassSectionPicker";
+import { Modal } from "../../components/Modal";
+import { ConfirmModal } from "../../components/ConfirmModal";
+import { Spinner } from "../../components/Spinner";
 import { getMySubjects } from "../../api/subjects";
 import * as attendanceApi from "../../api/attendance";
+import * as studentsApi from "../../api/students";
 import { errorMessage } from "../../api/client";
 import type { Subject } from "../../types";
-import type { ClassSectionSummary } from "../../types/roster";
+import type { ClassSectionSummary, Student } from "../../types/roster";
 import type { StudentAttendanceStatus } from "../../types/attendance";
 
 function today(): string {
@@ -43,6 +47,8 @@ export function AttendancePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterVersion, setRosterVersion] = useState(0);
 
   const classSections = useMemo(() => {
     const map = new Map<number, ClassSectionSummary>();
@@ -86,7 +92,7 @@ export function AttendancePage() {
       })
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
-  }, [classSectionId, date, mode, subjectId, period]);
+  }, [classSectionId, date, mode, subjectId, period, rosterVersion]);
 
   function markAllPresent() {
     const next: Record<number, StudentAttendanceStatus> = {};
@@ -121,7 +127,15 @@ export function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Mark Attendance" description="Take attendance for your class, daily or period-wise." />
+      <PageHeader
+        title="Mark Attendance"
+        description="Take attendance for your class, daily or period-wise."
+        actions={
+          <Button variant="secondary" onClick={() => setRosterOpen(true)} disabled={classSections.length === 0}>
+            <UsersIcon className="h-4 w-4" /> Manage Roster
+          </Button>
+        }
+      />
 
       {error && <Alert type="error">{error}</Alert>}
 
@@ -217,9 +231,12 @@ export function AttendancePage() {
           {loading ? (
             <SkeletonRows count={4} />
           ) : roster.length === 0 ? (
-            <p className="py-4 text-sm text-slate-400 dark:text-slate-500">
-              No students are on the roster for this class yet — ask your Principal to add them.
-            </p>
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <p className="text-sm text-slate-400 dark:text-slate-500">No students are on the roster for this class yet.</p>
+              <Button size="sm" onClick={() => setRosterOpen(true)}>
+                <PlusIcon className="h-4 w-4" /> Add students
+              </Button>
+            </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-white/[0.08]">
               {roster.map((s) => (
@@ -255,6 +272,140 @@ export function AttendancePage() {
       </Card>
 
       <Toast message={toast} onClose={() => setToast(null)} />
+
+      {rosterOpen && (
+        <RosterModal
+          classSections={classSections}
+          initialClassSectionId={classSectionId}
+          onClose={() => {
+            setRosterOpen(false);
+            setRosterVersion((v) => v + 1);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function RosterModal({
+  classSections,
+  initialClassSectionId,
+  onClose,
+}: {
+  classSections: ClassSectionSummary[];
+  initialClassSectionId: number | null;
+  onClose: () => void;
+}) {
+  const [classSectionId, setClassSectionId] = useState<number | null>(initialClassSectionId ?? classSections[0]?.id ?? null);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [rollNumber, setRollNumber] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!classSectionId) return;
+    setLoading(true);
+    studentsApi
+      .listStudents(classSectionId)
+      .then(setStudents)
+      .catch((e) => setError(errorMessage(e)))
+      .finally(() => setLoading(false));
+  }, [classSectionId]);
+
+  async function handleAdd() {
+    if (!classSectionId || !name.trim() || !rollNumber.trim()) return;
+    setAdding(true);
+    try {
+      const created = await studentsApi.createStudent(classSectionId, name.trim(), rollNumber.trim());
+      setStudents((prev) => [...prev, created].sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true })));
+      setName("");
+      setRollNumber("");
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await studentsApi.deactivateStudent(deleteTarget.id);
+      setStudents((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Manage Student Roster" widthClass="max-w-lg">
+      {error && (
+        <div className="mb-3">
+          <Alert type="error">{error}</Alert>
+        </div>
+      )}
+      <ClassSectionPicker classSections={classSections} value={classSectionId} onChange={setClassSectionId} />
+
+      <div className="mt-4 flex items-end gap-2">
+        <Field label="Name">
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="Student name" />
+        </Field>
+        <Field label="Roll No.">
+          <TextInput value={rollNumber} onChange={(e) => setRollNumber(e.target.value)} placeholder="e.g. 14" className="w-24" />
+        </Field>
+        <Button size="sm" onClick={handleAdd} loading={adding} disabled={!name.trim() || !rollNumber.trim()}>
+          <PlusIcon className="h-4 w-4" /> Add
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Spinner className="h-6 w-6" />
+        </div>
+      ) : students.length === 0 ? (
+        <p className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No students in this class yet.</p>
+      ) : (
+        <div className="mt-4 max-h-72 divide-y divide-slate-100 overflow-y-auto dark:divide-white/[0.08]">
+          {students.map((s) => (
+            <div key={s.id} className="flex items-center justify-between gap-3 py-2">
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.name}</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">Roll No. {s.rollNumber}</p>
+              </div>
+              <button
+                onClick={() => setDeleteTarget(s)}
+                className="rounded-full p-1.5 text-slate-400 transition-colors hover:bg-coral-50 hover:text-coral-600 dark:text-slate-500 dark:hover:bg-coral-500/15 dark:hover:text-coral-400"
+                aria-label="Remove student"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Remove student?"
+        message={
+          <>
+            Remove <strong>{deleteTarget?.name}</strong> from the roster? Their past attendance history is kept, but they won't appear
+            in future attendance lists.
+          </>
+        }
+        confirmLabel="Remove"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </Modal>
   );
 }
