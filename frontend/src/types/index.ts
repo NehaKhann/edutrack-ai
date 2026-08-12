@@ -13,6 +13,8 @@ export interface Subject {
   name: string;
   classSectionId: number;
   classSectionName: string;
+  className: string;
+  sectionName: string | null;
   teacherId: number;
   teacherName: string;
 }

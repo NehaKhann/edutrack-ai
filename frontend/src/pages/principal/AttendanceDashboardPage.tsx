@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PlusIcon, TrashIcon, UsersIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, UsersIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../../components/Card";
@@ -12,9 +12,11 @@ import { Modal } from "../../components/Modal";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { ResponsiveTable } from "../../components/ResponsiveTable";
 import { StatCard } from "../../components/StatCard";
+import { ClassSectionPicker } from "../../components/ClassSectionPicker";
 import { PercentBarChart, StatusDonutChart, TrendLineChart } from "../../components/Charts";
 import * as attendanceApi from "../../api/attendance";
 import * as studentsApi from "../../api/students";
+import * as classSectionsApi from "../../api/classSections";
 import { listClassSections } from "../../api/classSections";
 import { errorMessage } from "../../api/client";
 import { formatDate } from "../../utils/date";
@@ -34,6 +36,7 @@ export function AttendanceDashboardPage() {
   const [lowAttendance, setLowAttendance] = useState(false);
   const [detailFor, setDetailFor] = useState<ClassAttendanceSummary | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
+  const [classesModalOpen, setClassesModalOpen] = useState(false);
 
   const [trend, setTrend] = useState<{ label: string; value: number }[]>([]);
 
@@ -83,9 +86,14 @@ export function AttendanceDashboardPage() {
         title="Attendance Dashboard"
         description="Today's attendance completion across every class."
         actions={
-          <Button variant="secondary" onClick={() => setRosterOpen(true)}>
-            <UsersIcon className="h-4 w-4" /> Manage Roster
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setClassesModalOpen(true)}>
+              <Squares2X2Icon className="h-4 w-4" /> Manage Classes
+            </Button>
+            <Button variant="secondary" onClick={() => setRosterOpen(true)}>
+              <UsersIcon className="h-4 w-4" /> Manage Roster
+            </Button>
+          </div>
         }
       />
 
@@ -236,6 +244,7 @@ export function AttendanceDashboardPage() {
 
       {detailFor && <AttendanceDetailModal summary={detailFor} date={date} onClose={() => setDetailFor(null)} />}
       {rosterOpen && <RosterModal onClose={() => setRosterOpen(false)} />}
+      {classesModalOpen && <ManageClassesModal onClose={() => setClassesModalOpen(false)} />}
     </div>
   );
 }
@@ -371,15 +380,7 @@ function RosterModal({ onClose }: { onClose: () => void }) {
           <Alert type="error">{error}</Alert>
         </div>
       )}
-      <Field label="Class">
-        <Select value={classSectionId ?? ""} onChange={(e) => setClassSectionId(Number(e.target.value))}>
-          {classSections.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <ClassSectionPicker classSections={classSections} value={classSectionId} onChange={setClassSectionId} />
 
       <div className="mt-4 flex items-end gap-2">
         <Field label="Name">
@@ -432,6 +433,144 @@ function RosterModal({ onClose }: { onClose: () => void }) {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+    </Modal>
+  );
+}
+
+function ManageClassesModal({ onClose }: { onClose: () => void }) {
+  const [classSections, setClassSections] = useState<ClassSectionSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [newClassName, setNewClassName] = useState("");
+  const [creatingClass, setCreatingClass] = useState(false);
+
+  const [sectionClassName, setSectionClassName] = useState("");
+  const [newSectionName, setNewSectionName] = useState("");
+  const [addingSection, setAddingSection] = useState(false);
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  function refresh() {
+    setLoading(true);
+    listClassSections()
+      .then(setClassSections)
+      .catch((e) => setError(errorMessage(e)))
+      .finally(() => setLoading(false));
+  }
+
+  const classNames = [...new Set(classSections.map((c) => c.className))].sort();
+  const groups = new Map<string, ClassSectionSummary[]>();
+  for (const cs of classSections) {
+    const arr = groups.get(cs.className) ?? [];
+    arr.push(cs);
+    groups.set(cs.className, arr);
+  }
+
+  async function handleCreateClass() {
+    if (!newClassName.trim()) return;
+    setCreatingClass(true);
+    setError(null);
+    try {
+      await classSectionsApi.createClass(newClassName.trim());
+      setNewClassName("");
+      refresh();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setCreatingClass(false);
+    }
+  }
+
+  async function handleAddSection() {
+    if (!sectionClassName || !newSectionName.trim()) return;
+    setAddingSection(true);
+    setError(null);
+    try {
+      await classSectionsApi.addSection(sectionClassName, newSectionName.trim());
+      setNewSectionName("");
+      refresh();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setAddingSection(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Manage Classes & Sections" widthClass="max-w-lg">
+      <div className="space-y-5">
+        {error && <Alert type="error">{error}</Alert>}
+
+        <div>
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Existing Classes</h4>
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <Spinner className="h-5 w-5" />
+            </div>
+          ) : groups.size === 0 ? (
+            <p className="text-sm text-slate-400 dark:text-slate-500">No classes yet.</p>
+          ) : (
+            <div className="max-h-52 space-y-2 overflow-y-auto">
+              {[...groups.entries()].map(([cn, sections]) => (
+                <div key={cn} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/5">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{cn}</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {sections.map((s) => (
+                      <span
+                        key={s.id}
+                        className="rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600 ring-1 ring-inset ring-slate-200 dark:bg-navy-800 dark:text-slate-300 dark:ring-white/10"
+                      >
+                        {s.sectionName ?? "No section"}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 dark:border-white/10">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Add a New Class</h4>
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Class name">
+              <TextInput value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g. Grade 8" />
+            </Field>
+            <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
+              <PlusIcon className="h-4 w-4" /> Add
+            </Button>
+          </div>
+          <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">Creates a class with no sections — fine if this class doesn't need any.</p>
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 dark:border-white/10">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Add a Section to a Class</h4>
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Class">
+              <Select value={sectionClassName} onChange={(e) => setSectionClassName(e.target.value)} className="w-36">
+                <option value="">Select...</option>
+                {classNames.map((cn) => (
+                  <option key={cn} value={cn}>
+                    {cn}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Section name">
+              <TextInput value={newSectionName} onChange={(e) => setNewSectionName(e.target.value)} placeholder="e.g. Violet" />
+            </Field>
+            <Button size="sm" onClick={handleAddSection} loading={addingSection} disabled={!sectionClassName || !newSectionName.trim()}>
+              <PlusIcon className="h-4 w-4" /> Add
+            </Button>
+          </div>
+          <p className="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+            Existing students, subjects, and timetable stay exactly where they are — a new section starts empty.
+          </p>
+        </div>
+      </div>
     </Modal>
   );
 }

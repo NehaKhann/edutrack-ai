@@ -8,10 +8,12 @@ import { Alert } from "../../components/Alert";
 import { SkeletonRows } from "../../components/Skeleton";
 import { Toast } from "../../components/Toast";
 import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
+import { ClassSectionPicker } from "../../components/ClassSectionPicker";
 import { getMySubjects } from "../../api/subjects";
 import * as attendanceApi from "../../api/attendance";
 import { errorMessage } from "../../api/client";
 import type { Subject } from "../../types";
+import type { ClassSectionSummary } from "../../types/roster";
 import type { StudentAttendanceStatus } from "../../types/attendance";
 
 function today(): string {
@@ -43,9 +45,11 @@ export function AttendancePage() {
   const [toast, setToast] = useState<string | null>(null);
 
   const classSections = useMemo(() => {
-    const map = new Map<number, string>();
-    subjects.forEach((s) => map.set(s.classSectionId, s.classSectionName));
-    return [...map.entries()].map(([id, name]) => ({ id, name }));
+    const map = new Map<number, ClassSectionSummary>();
+    subjects.forEach((s) =>
+      map.set(s.classSectionId, { id: s.classSectionId, name: s.classSectionName, className: s.className, sectionName: s.sectionName })
+    );
+    return [...map.values()];
   }, [subjects]);
 
   const classSubjects = useMemo(() => subjects.filter((s) => s.classSectionId === classSectionId), [subjects, classSectionId]);
@@ -127,15 +131,13 @@ export function AttendancePage() {
             <Field label="Date">
               <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
             </Field>
-            <Field label="Class">
-              <Select value={classSectionId ?? ""} onChange={(e) => setClassSectionId(Number(e.target.value))} className="w-40">
-                {classSections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <ClassSectionPicker
+              classSections={classSections}
+              value={classSectionId}
+              onChange={setClassSectionId}
+              selectClassName="w-40"
+              containerClassName="flex flex-wrap items-end gap-3"
+            />
             <Field label="Mode">
               <div className="inline-flex rounded-lg border border-slate-300 bg-white/80 p-0.5 dark:border-white/15 dark:bg-white/5">
                 <button

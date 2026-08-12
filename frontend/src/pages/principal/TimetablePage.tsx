@@ -7,6 +7,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { SkeletonRows } from "../../components/Skeleton";
 import { Field, Select } from "../../components/FormFields";
 import { SegmentedControl } from "../../components/SegmentedControl";
+import { ClassSectionPicker } from "../../components/ClassSectionPicker";
 import { TimetableGrid } from "../../components/TimetableGrid";
 import { TimetableCellEditorModal, type CellEditorOption } from "../../components/TimetableCellEditorModal";
 import * as timetableApi from "../../api/timetable";
@@ -166,21 +167,7 @@ export function TimetablePage() {
 
       {view === "class" ? (
         <div className="space-y-4">
-          <div className="max-w-xs">
-            <Field label="Class">
-              <Select
-                value={selectedClassId ?? ""}
-                onChange={(e) => setSelectedClassId(Number(e.target.value))}
-                disabled={classSections.length === 0}
-              >
-                {classSections.map((cs) => (
-                  <option key={cs.id} value={cs.id}>
-                    {cs.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-          </div>
+          <ClassSectionPicker classSections={classSections} value={selectedClassId} onChange={setSelectedClassId} />
 
           {classLoading ? (
             <SkeletonRows count={5} />

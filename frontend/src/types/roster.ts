@@ -7,7 +7,10 @@ export interface Student {
 
 export interface ClassSectionSummary {
   id: number;
+  /** Full display label — "Grade 6" alone, or "Grade 6 — Violet" when this row is a section. */
   name: string;
+  className: string;
+  sectionName: string | null;
 }
 
 export interface TeacherSummary {

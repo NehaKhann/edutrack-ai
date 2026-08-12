@@ -9,6 +9,7 @@ import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/Button";
+import { ClassSectionPicker } from "../../components/ClassSectionPicker";
 import * as diaryApi from "../../api/diary";
 import { listClassSections } from "../../api/classSections";
 import { errorMessage } from "../../api/client";
@@ -92,15 +93,12 @@ export function DiaryOverviewPage() {
           <Field label="Date">
             <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
           </Field>
-          <Field label="Class">
-            <Select value={classSectionId ?? ""} onChange={(e) => setClassSectionId(Number(e.target.value))} className="w-44">
-              {classSections.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <ClassSectionPicker
+            classSections={classSections}
+            value={classSectionId}
+            onChange={setClassSectionId}
+            containerClassName="flex flex-wrap items-end gap-3"
+          />
           <Field label="Teacher">
             <Select value={teacherFilter} onChange={(e) => setTeacherFilter(e.target.value)} className="w-44">
               <option value="">All Teachers</option>
