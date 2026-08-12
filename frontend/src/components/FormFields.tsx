@@ -1,7 +1,7 @@
 import {
   Children,
   isValidElement,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -9,6 +9,7 @@ import {
   type LabelHTMLAttributes,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronUpDownIcon } from "@heroicons/react/24/outline";
 import clsx from "clsx";
@@ -61,21 +62,42 @@ export function Select({ value, defaultValue, onChange, className, disabled, chi
   const [open, setOpen] = useState(false);
   const [internal, setInternal] = useState(() => (defaultValue === undefined ? "" : String(defaultValue)));
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; openUpward: boolean } | null>(null);
 
   const current = value === undefined ? internal : String(value);
   const selected = options.find((o) => o.value === current);
 
-  useEffect(() => {
+  // The trigger can sit inside a Card (backdrop-blur creates its own stacking context), which would
+  // trap a same-DOM absolutely-positioned panel behind later sibling cards regardless of z-index.
+  // Portaling to document.body and positioning from the trigger's real screen coordinates avoids that.
+  useLayoutEffect(() => {
     if (!open) return;
+    function updateRect() {
+      const el = containerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - r.bottom;
+      const openUpward = spaceBelow < 260 && r.top > spaceBelow;
+      setRect({ top: openUpward ? r.top : r.bottom, left: r.left, width: r.width, openUpward });
+    }
+    updateRect();
     function handlePointer(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (containerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     }
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
     document.addEventListener("mousedown", handlePointer);
     document.addEventListener("keydown", handleKey);
     return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
       document.removeEventListener("mousedown", handlePointer);
       document.removeEventListener("keydown", handleKey);
     };
@@ -106,39 +128,50 @@ export function Select({ value, defaultValue, onChange, className, disabled, chi
         />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.12 }}
-            role="listbox"
-            className="absolute left-0 top-full z-50 mt-1.5 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-white/10 dark:bg-navy-800"
-          >
-            {options.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                role="option"
-                aria-selected={opt.value === current}
-                disabled={opt.disabled}
-                onClick={() => choose(opt)}
-                className={clsx(
-                  "flex w-full items-center rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
-                  opt.disabled
-                    ? "cursor-default text-slate-400 dark:text-slate-500"
-                    : opt.value === current
-                      ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
-                      : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.08]"
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {createPortal(
+        <AnimatePresence>
+          {open && rect && (
+            <motion.div
+              ref={panelRef}
+              initial={{ opacity: 0, y: rect.openUpward ? 4 : -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: rect.openUpward ? 4 : -4, scale: 0.98 }}
+              transition={{ duration: 0.12 }}
+              role="listbox"
+              style={{
+                position: "fixed",
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                transform: rect.openUpward ? "translateY(calc(-100% - 6px))" : "translateY(6px)",
+              }}
+              className="z-50 max-h-60 overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-lg dark:border-white/10 dark:bg-navy-800"
+            >
+              {options.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="option"
+                  aria-selected={opt.value === current}
+                  disabled={opt.disabled}
+                  onClick={() => choose(opt)}
+                  className={clsx(
+                    "flex w-full items-center rounded-lg px-3 py-1.5 text-left text-sm transition-colors",
+                    opt.disabled
+                      ? "cursor-default text-slate-400 dark:text-slate-500"
+                      : opt.value === current
+                        ? "bg-brand-50 font-medium text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+                        : "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/[0.08]"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
