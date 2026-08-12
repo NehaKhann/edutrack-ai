@@ -8,11 +8,13 @@ import { ProfilePage } from "./pages/teacher/ProfilePage";
 import { DiaryPage } from "./pages/teacher/DiaryPage";
 import { AttendancePage } from "./pages/teacher/AttendancePage";
 import { MyAttendancePage } from "./pages/teacher/MyAttendancePage";
+import { MyTimetablePage } from "./pages/teacher/MyTimetablePage";
 import { CoverageGridPage } from "./pages/principal/CoverageGridPage";
 import { TeacherDirectoryPage } from "./pages/principal/TeacherDirectoryPage";
 import { DiaryOverviewPage } from "./pages/principal/DiaryOverviewPage";
 import { AttendanceDashboardPage } from "./pages/principal/AttendanceDashboardPage";
 import { TeacherAttendancePage } from "./pages/principal/TeacherAttendancePage";
+import { TimetablePage } from "./pages/principal/TimetablePage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { SearchPage } from "./pages/SearchPage";
 import { useAuth } from "./auth/AuthContext";
@@ -45,10 +47,12 @@ export default function App() {
             <Route path="/teacher/diary" element={<DiaryPage />} />
             <Route path="/teacher/attendance" element={<AttendancePage />} />
             <Route path="/teacher/my-attendance" element={<MyAttendancePage />} />
+            <Route path="/teacher/timetable" element={<MyTimetablePage />} />
           </Route>
 
           <Route element={<ProtectedRoute allow={["PRINCIPAL", "ADMIN"]} />}>
             <Route path="/principal/coverage" element={<CoverageGridPage />} />
+            <Route path="/principal/timetable" element={<TimetablePage />} />
             <Route path="/principal/teachers" element={<TeacherDirectoryPage />} />
             <Route path="/principal/diary" element={<DiaryOverviewPage />} />
             <Route path="/principal/attendance" element={<AttendanceDashboardPage />} />
