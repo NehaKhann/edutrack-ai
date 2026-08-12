@@ -35,6 +35,13 @@ public class User {
     @JoinColumn(name = "school_id", nullable = false)
     private School school;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
+    /** Plaintext temporary password, set when the principal creates/resets an account; cleared once the user changes it. */
+    @Column(name = "temp_password")
+    private String tempPassword;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 

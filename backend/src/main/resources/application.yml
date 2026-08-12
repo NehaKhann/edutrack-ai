@@ -55,6 +55,10 @@ cors:
 seed:
   enabled: ${SEED_ENABLED:true}
 
+reset:
+  demo:
+    data: ${RESET_DEMO_DATA:false}
+
 logging:
   level:
     com.edutrack: INFO

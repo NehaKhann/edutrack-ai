@@ -1,26 +1,29 @@
 package com.edutrack.profile.service;
 
 import com.edutrack.common.ApiException;
+import com.edutrack.notification.service.NotificationService;
 import com.edutrack.org.dto.SubjectResponse;
 import com.edutrack.org.entity.Role;
+import com.edutrack.org.entity.School;
 import com.edutrack.org.entity.User;
 import com.edutrack.org.repository.SubjectRepository;
 import com.edutrack.org.repository.UserRepository;
+import com.edutrack.profile.dto.TeacherAccountResponse;
 import com.edutrack.profile.dto.TeacherDirectoryEntry;
 import com.edutrack.profile.dto.TeacherProfileResponse;
 import com.edutrack.profile.dto.TeacherProfileUpdateRequest;
-import com.edutrack.profile.dto.TimetableSlotResponse;
 import com.edutrack.profile.entity.TeacherProfile;
 import com.edutrack.profile.repository.TeacherProfileRepository;
-import com.edutrack.profile.repository.TimetableSlotRepository;
 import com.edutrack.security.AuthenticatedUser;
 import com.edutrack.security.CurrentUser;
 import com.edutrack.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.List;
 
@@ -29,12 +32,19 @@ import java.util.List;
 public class TeacherProfileService {
 
     private static final List<String> ALLOWED_PHOTO_TYPES = List.of("image/jpeg", "image/png", "image/webp");
+    private static final List<String> ALLOWED_CV_TYPES = List.of(
+            "application/pdf", "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+    private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final TeacherProfileRepository teacherProfileRepository;
-    private final TimetableSlotRepository timetableSlotRepository;
     private final UserRepository userRepository;
     private final SubjectRepository subjectRepository;
     private final FileStorageService fileStorageService;
+    private final PasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public TeacherProfileResponse getMyProfile() {
@@ -53,6 +63,9 @@ public class TeacherProfileService {
         TeacherProfile profile = getOrCreate(teacherId);
         profile.setDesignation(request.designation());
         profile.setBio(request.bio());
+        if (request.phone() != null) {
+            profile.setPhone(request.phone());
+        }
         profile.setUpdatedAt(Instant.now());
         teacherProfileRepository.save(profile);
         return buildResponse(teacherId);
@@ -101,9 +114,131 @@ public class TeacherProfileService {
     }
 
     @Transactional(readOnly = true)
+    public byte[] getCvBytes(Long teacherId) {
+        assertSameSchool(teacherId);
+        TeacherProfile profile = teacherProfileRepository.findByUserId(teacherId)
+                .orElseThrow(() -> ApiException.notFound("No CV uploaded"));
+        if (profile.getCvFileRef() == null) {
+            throw ApiException.notFound("No CV uploaded");
+        }
+        return fileStorageService.load(profile.getCvFileRef());
+    }
+
+    @Transactional(readOnly = true)
+    public String getCvFilename(Long teacherId) {
+        assertSameSchool(teacherId);
+        return teacherProfileRepository.findByUserId(teacherId)
+                .map(TeacherProfile::getCvFilename)
+                .orElse("cv");
+    }
+
+    @Transactional(readOnly = true)
     public List<TeacherDirectoryEntry> listDirectory() {
         Long schoolId = CurrentUser.get().getSchoolId();
-        return userRepository.findBySchoolIdAndRole(schoolId, Role.TEACHER).stream()
+        return toDirectoryEntries(userRepository.findBySchoolIdAndRoleAndActive(schoolId, Role.TEACHER, true));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TeacherDirectoryEntry> listInactiveDirectory() {
+        Long schoolId = CurrentUser.get().getSchoolId();
+        return toDirectoryEntries(userRepository.findBySchoolIdAndRoleAndActive(schoolId, Role.TEACHER, false));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TeacherAccountResponse> listAccounts() {
+        Long schoolId = CurrentUser.get().getSchoolId();
+        return userRepository.findBySchoolIdAndRoleAndActive(schoolId, Role.TEACHER, true).stream()
+                .map(teacher -> TeacherAccountResponse.from(teacher, teacherProfileRepository.findByUserId(teacher.getId()).orElse(null)))
+                .toList();
+    }
+
+    @Transactional
+    public TeacherAccountResponse createTeacherAccount(String name, String email, String phone, MultipartFile cv) {
+        if (userRepository.existsByEmailIgnoreCase(email)) {
+            throw ApiException.conflict("An account with this email already exists");
+        }
+        if (cv != null && !cv.isEmpty()) {
+            if (cv.getContentType() == null || !ALLOWED_CV_TYPES.contains(cv.getContentType())) {
+                throw ApiException.badRequest("Please upload the CV as a PDF or Word document");
+            }
+        }
+
+        School school = userRepository.findById(CurrentUser.get().getUserId())
+                .map(User::getSchool)
+                .orElseThrow(() -> ApiException.notFound("School not found"));
+
+        String tempPassword = generateTempPassword();
+        User teacher = new User(name.trim(), email.trim().toLowerCase(), passwordEncoder.encode(tempPassword), Role.TEACHER, school);
+        teacher.setTempPassword(tempPassword);
+        teacher = userRepository.save(teacher);
+
+        TeacherProfile profile = new TeacherProfile(teacher);
+        if (phone != null && !phone.isBlank()) {
+            profile.setPhone(phone.trim());
+        }
+        if (cv != null && !cv.isEmpty()) {
+            String ref = fileStorageService.store(cv, "teacher-cvs");
+            profile.setCvFileRef(ref);
+            profile.setCvFilename(cv.getOriginalFilename());
+        }
+        teacherProfileRepository.save(profile);
+
+        return TeacherAccountResponse.from(teacher, profile);
+    }
+
+    @Transactional
+    public void changeMyPassword(String currentPassword, String newPassword) {
+        Long teacherId = currentTeacherId();
+        User teacher = userRepository.findById(teacherId).orElseThrow(() -> ApiException.notFound("Teacher not found"));
+        if (!passwordEncoder.matches(currentPassword, teacher.getPasswordHash())) {
+            throw ApiException.badRequest("Current password is incorrect");
+        }
+        boolean wasFirstChange = teacher.getTempPassword() != null;
+        teacher.setPasswordHash(passwordEncoder.encode(newPassword));
+        teacher.setTempPassword(null);
+        userRepository.save(teacher);
+
+        if (wasFirstChange) {
+            userRepository.findBySchoolIdAndRole(teacher.getSchool().getId(), Role.PRINCIPAL)
+                    .forEach(principal -> notificationService.notify(principal,
+                            "Teacher " + teacher.getName() + " has successfully logged in and changed the password."));
+        }
+    }
+
+    @Transactional
+    public void deactivateTeacher(Long teacherId) {
+        User teacher = findTeacherInSchool(teacherId);
+        teacher.setActive(false);
+        userRepository.save(teacher);
+    }
+
+    @Transactional
+    public void reactivateTeacher(Long teacherId) {
+        User teacher = findTeacherInSchool(teacherId);
+        teacher.setActive(true);
+        userRepository.save(teacher);
+    }
+
+    private String generateTempPassword() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 10; i++) {
+            sb.append(TEMP_PASSWORD_CHARS.charAt(RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+        }
+        return sb.toString();
+    }
+
+    private User findTeacherInSchool(Long teacherId) {
+        User teacher = userRepository.findById(teacherId)
+                .filter(u -> u.getRole() == Role.TEACHER)
+                .orElseThrow(() -> ApiException.notFound("Teacher not found"));
+        if (!teacher.getSchool().getId().equals(CurrentUser.get().getSchoolId())) {
+            throw ApiException.notFound("Teacher not found");
+        }
+        return teacher;
+    }
+
+    private List<TeacherDirectoryEntry> toDirectoryEntries(List<User> teachers) {
+        return teachers.stream()
                 .map(teacher -> {
                     TeacherProfile profile = teacherProfileRepository.findByUserId(teacher.getId()).orElse(null);
                     long subjectCount = subjectRepository.findByTeacherId(teacher.getId()).size();
@@ -116,56 +251,12 @@ public class TeacherProfileService {
                 }).toList();
     }
 
-    @Transactional(readOnly = true)
-    public List<TimetableSlotResponse> listMyTimetable() {
-        return timetableSlotRepository.findByTeacherIdOrderByDayOfWeekAscStartTimeAsc(currentTeacherId())
-                .stream().map(TimetableSlotResponse::from).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<TimetableSlotResponse> listTimetableFor(Long teacherId) {
-        assertSameSchool(teacherId);
-        return timetableSlotRepository.findByTeacherIdOrderByDayOfWeekAscStartTimeAsc(teacherId)
-                .stream().map(TimetableSlotResponse::from).toList();
-    }
-
-    @Transactional
-    public TimetableSlotResponse addSlot(Long subjectId, java.time.DayOfWeek dayOfWeek, java.time.LocalTime start, java.time.LocalTime end) {
-        if (!end.isAfter(start)) {
-            throw ApiException.badRequest("End time must be after start time");
-        }
-        Long teacherId = currentTeacherId();
-        User teacher = userRepository.findById(teacherId).orElseThrow();
-        com.edutrack.org.entity.Subject subject = null;
-        if (subjectId != null) {
-            subject = subjectRepository.findById(subjectId)
-                    .orElseThrow(() -> ApiException.notFound("Subject not found"));
-            if (!subject.getTeacher().getId().equals(teacherId)) {
-                throw ApiException.forbidden("You can only add timetable slots for subjects you teach");
-            }
-        }
-        var slot = new com.edutrack.profile.entity.TimetableSlot(teacher, subject, dayOfWeek, start, end);
-        return TimetableSlotResponse.from(timetableSlotRepository.save(slot));
-    }
-
-    @Transactional
-    public void deleteSlot(Long slotId) {
-        var slot = timetableSlotRepository.findById(slotId)
-                .orElseThrow(() -> ApiException.notFound("Timetable slot not found"));
-        if (!slot.getTeacher().getId().equals(currentTeacherId())) {
-            throw ApiException.forbidden("You can only manage your own timetable");
-        }
-        timetableSlotRepository.delete(slot);
-    }
-
     private TeacherProfileResponse buildResponse(Long teacherId) {
         User teacher = userRepository.findById(teacherId)
                 .orElseThrow(() -> ApiException.notFound("Teacher not found"));
         TeacherProfile profile = teacherProfileRepository.findByUserId(teacherId).orElse(null);
         List<SubjectResponse> subjects = subjectRepository.findByTeacherId(teacherId).stream().map(SubjectResponse::from).toList();
-        List<TimetableSlotResponse> timetable = timetableSlotRepository.findByTeacherIdOrderByDayOfWeekAscStartTimeAsc(teacherId)
-                .stream().map(TimetableSlotResponse::from).toList();
-        return TeacherProfileResponse.from(teacher, profile, subjects, timetable);
+        return TeacherProfileResponse.from(teacher, profile, subjects);
     }
 
     private TeacherProfile getOrCreate(Long teacherId) {

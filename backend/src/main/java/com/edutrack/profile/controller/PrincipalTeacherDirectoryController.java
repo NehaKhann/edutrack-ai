@@ -1,17 +1,16 @@
 package com.edutrack.profile.controller;
 
 import com.edutrack.common.ApiResponse;
+import com.edutrack.profile.dto.TeacherAccountResponse;
 import com.edutrack.profile.dto.TeacherDirectoryEntry;
 import com.edutrack.profile.dto.TeacherProfileResponse;
-import com.edutrack.profile.dto.TimetableSlotResponse;
 import com.edutrack.profile.service.TeacherProfileService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +26,25 @@ public class PrincipalTeacherDirectoryController {
         return ApiResponse.ok(teacherProfileService.listDirectory());
     }
 
+    @GetMapping("/inactive")
+    public ApiResponse<List<TeacherDirectoryEntry>> inactiveDirectory() {
+        return ApiResponse.ok(teacherProfileService.listInactiveDirectory());
+    }
+
+    @GetMapping("/accounts")
+    public ApiResponse<List<TeacherAccountResponse>> accounts() {
+        return ApiResponse.ok(teacherProfileService.listAccounts());
+    }
+
+    @PostMapping(value = "/accounts", consumes = "multipart/form-data")
+    public ApiResponse<TeacherAccountResponse> createAccount(
+            @RequestParam String name,
+            @RequestParam String email,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) MultipartFile cv) {
+        return ApiResponse.ok(teacherProfileService.createTeacherAccount(name, email, phone, cv), "Teacher account created");
+    }
+
     @GetMapping("/{teacherId}")
     public ApiResponse<TeacherProfileResponse> detail(@PathVariable Long teacherId) {
         return ApiResponse.ok(teacherProfileService.getProfileFor(teacherId));
@@ -39,8 +57,28 @@ public class PrincipalTeacherDirectoryController {
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(contentType)).body(bytes);
     }
 
-    @GetMapping("/{teacherId}/timetable")
-    public ApiResponse<List<TimetableSlotResponse>> timetable(@PathVariable Long teacherId) {
-        return ApiResponse.ok(teacherProfileService.listTimetableFor(teacherId));
+    @GetMapping("/{teacherId}/cv")
+    public ResponseEntity<byte[]> cv(@PathVariable Long teacherId) {
+        byte[] bytes = teacherProfileService.getCvBytes(teacherId);
+        String filename = teacherProfileService.getCvFilename(teacherId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitize(filename) + "\"")
+                .body(bytes);
+    }
+
+    @PostMapping("/{teacherId}/deactivate")
+    public ApiResponse<Void> deactivate(@PathVariable Long teacherId) {
+        teacherProfileService.deactivateTeacher(teacherId);
+        return ApiResponse.ok(null);
+    }
+
+    @PostMapping("/{teacherId}/reactivate")
+    public ApiResponse<Void> reactivate(@PathVariable Long teacherId) {
+        teacherProfileService.reactivateTeacher(teacherId);
+        return ApiResponse.ok(null);
+    }
+
+    private String sanitize(String filename) {
+        return filename == null ? "cv" : filename.replaceAll("[\\r\\n\"]", "_");
     }
 }

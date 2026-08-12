@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { createPortal } from "react-dom";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -23,6 +24,8 @@ import {
 import { useAuth } from "../auth/AuthContext";
 import { AmbientBackground } from "../components/AmbientBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
+import * as notificationsApi from "../api/notifications";
+import type { AppNotification } from "../types/notification";
 
 const teacherNav = [
   { to: "/teacher/lesson-plan", label: "Today's Plan", icon: CalendarDaysIcon },
@@ -175,13 +178,7 @@ export function AppLayout() {
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <button
-              aria-label="Notifications"
-              className="relative grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/70 text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
-            >
-              <BellIcon className="h-[17px] w-[17px]" />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-coral-500 shadow-[0_0_0_2px_white] dark:shadow-[0_0_0_2px_#0B1230]" />
-            </button>
+            <NotificationBell />
             <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20">
               {roleLabel}
             </span>
@@ -206,5 +203,145 @@ export function AppLayout() {
         </main>
       </div>
     </div>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function NotificationBell() {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    notificationsApi
+      .unreadCount()
+      .then((res) => setUnread(res.count))
+      .catch(() => {});
+    const interval = window.setInterval(() => {
+      notificationsApi
+        .unreadCount()
+        .then((res) => setUnread(res.count))
+        .catch(() => {});
+    }, 30000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    function updateRect() {
+      const el = triggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.bottom, right: window.innerWidth - r.right });
+    }
+    updateRect();
+    if (!loaded) {
+      notificationsApi
+        .list()
+        .then((list) => {
+          setNotifications(list);
+          setLoaded(true);
+        })
+        .catch(() => {});
+    }
+    function handlePointer(e: MouseEvent) {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    document.addEventListener("mousedown", handlePointer);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+      document.removeEventListener("mousedown", handlePointer);
+    };
+  }, [open, loaded]);
+
+  async function handleToggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && unread > 0) {
+      try {
+        await notificationsApi.markAllRead();
+        setUnread(0);
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      } catch {
+        // non-critical
+      }
+    }
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        aria-label="Notifications"
+        onClick={handleToggle}
+        className="relative grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/70 text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+      >
+        <BellIcon className="h-[17px] w-[17px]" />
+        {unread > 0 && (
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-coral-500 shadow-[0_0_0_2px_white] dark:shadow-[0_0_0_2px_#0B1230]" />
+        )}
+      </button>
+
+      {createPortal(
+        <AnimatePresence>
+          {open && rect && (
+            <motion.div
+              ref={panelRef}
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.12 }}
+              style={{ position: "fixed", top: rect.top + 8, right: rect.right }}
+              className="z-50 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-navy-800"
+            >
+              <div className="border-b border-slate-100 px-4 py-3 dark:border-white/[0.08]">
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Notifications</h3>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {!loaded ? (
+                  <div className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">Loading…</div>
+                ) : notifications.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-slate-400 dark:text-slate-500">No notifications yet.</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={clsx(
+                        "border-b border-slate-50 px-4 py-3 text-sm last:border-b-0 dark:border-white/[0.05]",
+                        !n.read && "bg-brand-50/60 dark:bg-brand-500/[0.08]"
+                      )}
+                    >
+                      <p className="text-slate-700 dark:text-slate-200">{n.message}</p>
+                      <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">{timeAgo(n.createdAt)}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
   );
 }

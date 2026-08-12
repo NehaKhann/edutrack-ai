@@ -6,6 +6,7 @@ export interface UserSummary {
   email: string;
   role: Role;
   schoolId: number;
+  mustChangePassword: boolean;
 }
 
 export interface Subject {

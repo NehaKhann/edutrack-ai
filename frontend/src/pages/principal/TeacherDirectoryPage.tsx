@@ -1,5 +1,16 @@
-import { useEffect, useState } from "react";
-import { BriefcaseIcon, PlusIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { useEffect, useRef, useState } from "react";
+import {
+  BriefcaseIcon,
+  PlusIcon,
+  Squares2X2Icon,
+  UserMinusIcon,
+  ArrowUturnLeftIcon,
+  UserPlusIcon,
+  ClipboardDocumentIcon,
+  CheckIcon,
+  DocumentTextIcon,
+  ArrowDownTrayIcon,
+} from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody } from "../../components/Card";
 import { Button } from "../../components/Button";
@@ -8,28 +19,20 @@ import { EmptyState } from "../../components/EmptyState";
 import { SkeletonCardGrid } from "../../components/Skeleton";
 import { Badge } from "../../components/Badge";
 import { Modal } from "../../components/Modal";
+import { ConfirmModal } from "../../components/ConfirmModal";
 import { Field, TextInput, Select } from "../../components/FormFields";
 import { ClassSectionPicker } from "../../components/ClassSectionPicker";
 import { ProfilePhoto } from "../../components/ProfilePhoto";
 import { Spinner } from "../../components/Spinner";
+import { Toast } from "../../components/Toast";
 import * as profileApi from "../../api/teacherProfile";
 import * as subjectsApi from "../../api/subjects";
 import { listClassSections } from "../../api/classSections";
 import { listTeachers } from "../../api/teachers";
-import { errorMessage } from "../../api/client";
-import { DAYS_OF_WEEK, type DayOfWeek, type TeacherDirectoryEntry, type TeacherProfile } from "../../types/profile";
+import { apiClient, errorMessage } from "../../api/client";
+import type { TeacherAccount, TeacherDirectoryEntry, TeacherProfile } from "../../types/profile";
 import type { ClassSectionSummary, TeacherSummary } from "../../types/roster";
 import type { Subject } from "../../types";
-
-const DAY_LABELS: Record<DayOfWeek, string> = {
-  MONDAY: "Mon",
-  TUESDAY: "Tue",
-  WEDNESDAY: "Wed",
-  THURSDAY: "Thu",
-  FRIDAY: "Fri",
-  SATURDAY: "Sat",
-  SUNDAY: "Sun",
-};
 
 export function TeacherDirectoryPage() {
   const [teachers, setTeachers] = useState<TeacherDirectoryEntry[]>([]);
@@ -38,7 +41,17 @@ export function TeacherDirectoryPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<TeacherProfile | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [viewingInactive, setViewingInactive] = useState(false);
   const [subjectsModalOpen, setSubjectsModalOpen] = useState(false);
+  const [accountsModalOpen, setAccountsModalOpen] = useState(false);
+
+  const [showInactive, setShowInactive] = useState(false);
+  const [inactiveTeachers, setInactiveTeachers] = useState<TeacherDirectoryEntry[] | null>(null);
+  const [inactiveLoading, setInactiveLoading] = useState(false);
+
+  const [deactivateTarget, setDeactivateTarget] = useState<TeacherProfile | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
+  const [reactivatingId, setReactivatingId] = useState<number | null>(null);
 
   useEffect(() => {
     refreshDirectory();
@@ -52,8 +65,21 @@ export function TeacherDirectoryPage() {
       .finally(() => setLoading(false));
   }
 
-  async function openDetail(teacherId: number) {
+  function toggleShowInactive() {
+    if (!showInactive && inactiveTeachers === null) {
+      setInactiveLoading(true);
+      profileApi
+        .getInactiveDirectory()
+        .then(setInactiveTeachers)
+        .catch((e) => setError(errorMessage(e)))
+        .finally(() => setInactiveLoading(false));
+    }
+    setShowInactive((v) => !v);
+  }
+
+  async function openDetail(teacherId: number, inactive = false) {
     setSelectedId(teacherId);
+    setViewingInactive(inactive);
     setDetailLoading(true);
     try {
       const data = await profileApi.getTeacherProfile(teacherId);
@@ -65,15 +91,51 @@ export function TeacherDirectoryPage() {
     }
   }
 
+  async function confirmDeactivate() {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      await profileApi.deactivateTeacher(deactivateTarget.teacherId);
+      setDeactivateTarget(null);
+      setSelectedId(null);
+      setDetail(null);
+      setInactiveTeachers(null);
+      refreshDirectory();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
+  async function handleReactivate(teacherId: number) {
+    setReactivatingId(teacherId);
+    try {
+      await profileApi.reactivateTeacher(teacherId);
+      setInactiveTeachers((prev) => (prev ? prev.filter((t) => t.teacherId !== teacherId) : prev));
+      if (selectedId === teacherId) setSelectedId(null);
+      refreshDirectory();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setReactivatingId(null);
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="Teacher Directory"
         description="Every teacher's profile, subjects, and timetable in one place."
         actions={
-          <Button variant="secondary" onClick={() => setSubjectsModalOpen(true)}>
-            <Squares2X2Icon className="h-4 w-4" /> Manage Subjects
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={() => setAccountsModalOpen(true)}>
+              <UserPlusIcon className="h-4 w-4" /> Manage Teacher Accounts
+            </Button>
+            <Button variant="secondary" onClick={() => setSubjectsModalOpen(true)}>
+              <Squares2X2Icon className="h-4 w-4" /> Manage Subjects
+            </Button>
+          </div>
         }
       />
 
@@ -105,6 +167,56 @@ export function TeacherDirectoryPage() {
               </CardBody>
             </Card>
           ))}
+        </div>
+      )}
+
+      {!loading && (
+        <div className="mt-5">
+          <button
+            onClick={toggleShowInactive}
+            className="text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400"
+          >
+            {showInactive ? "Hide" : "Show"} removed teachers
+          </button>
+
+          {showInactive && (
+            <div className="mt-3">
+              {inactiveLoading ? (
+                <SkeletonCardGrid count={2} />
+              ) : !inactiveTeachers || inactiveTeachers.length === 0 ? (
+                <p className="text-sm text-slate-400 dark:text-slate-500">No removed teachers.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {inactiveTeachers.map((t) => (
+                    <Card key={t.teacherId} className="opacity-70">
+                      <CardBody className="flex flex-col gap-3">
+                        <div className="flex items-center gap-3 cursor-pointer" onClick={() => openDetail(t.teacherId, true)}>
+                          <ProfilePhoto path={profileApi.teacherPhotoPath(t.teacherId)} hasPhoto={t.hasPhoto} name={t.name} size="md" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-slate-600 dark:text-slate-300">{t.name}</p>
+                            <p className="truncate text-xs text-slate-400 dark:text-slate-500">{t.designation || "No designation set"}</p>
+                          </div>
+                          <Badge tone="gray">Removed</Badge>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReactivate(t.teacherId);
+                          }}
+                          loading={reactivatingId === t.teacherId}
+                        >
+                          <ArrowUturnLeftIcon className="h-4 w-4" /> Reactivate
+                        </Button>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -145,29 +257,36 @@ export function TeacherDirectoryPage() {
               )}
             </div>
 
-            <div>
-              <h4 className="mb-2 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Timetable</h4>
-              {detail.timetable.length === 0 ? (
-                <p className="text-sm text-slate-400 dark:text-slate-500">No timetable added.</p>
+            <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-white/10">
+              {viewingInactive ? (
+                <Button variant="secondary" onClick={() => handleReactivate(detail.teacherId)} loading={reactivatingId === detail.teacherId}>
+                  <ArrowUturnLeftIcon className="h-4 w-4" /> Reactivate Teacher
+                </Button>
               ) : (
-                <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 dark:divide-white/[0.08] dark:border-white/10">
-                  {[...detail.timetable]
-                    .sort((a, b) => DAYS_OF_WEEK.indexOf(a.dayOfWeek) - DAYS_OF_WEEK.indexOf(b.dayOfWeek))
-                    .map((slot) => (
-                      <div key={slot.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                        <span className="font-medium text-slate-700 dark:text-slate-200">{DAY_LABELS[slot.dayOfWeek]}</span>
-                        <span className="tabular-nums text-slate-500 dark:text-slate-400">
-                          {slot.startTime.slice(0, 5)}–{slot.endTime.slice(0, 5)}
-                        </span>
-                        <span className="text-slate-500 dark:text-slate-400">{slot.subjectName ?? "General"}</span>
-                      </div>
-                    ))}
-                </div>
+                <Button variant="danger" onClick={() => setDeactivateTarget(detail)}>
+                  <UserMinusIcon className="h-4 w-4" /> Remove Teacher
+                </Button>
               )}
             </div>
           </div>
         )}
       </Modal>
+
+      <ConfirmModal
+        open={deactivateTarget !== null}
+        title="Remove this teacher?"
+        message={
+          <>
+            <strong>{deactivateTarget?.name}</strong> will no longer be able to sign in, and won't appear in teacher-selection lists
+            going forward. Their existing attendance records, diary entries, and subject history are kept exactly as they are — you
+            can reactivate them later from "Show removed teachers".
+          </>
+        }
+        confirmLabel="Remove"
+        loading={deactivating}
+        onConfirm={confirmDeactivate}
+        onCancel={() => setDeactivateTarget(null)}
+      />
 
       {subjectsModalOpen && (
         <ManageSubjectsModal
@@ -177,7 +296,254 @@ export function TeacherDirectoryPage() {
           }}
         />
       )}
+
+      {accountsModalOpen && (
+        <ManageAccountsModal
+          onClose={() => {
+            setAccountsModalOpen(false);
+            refreshDirectory();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function ManageAccountsModal({ onClose }: { onClose: () => void }) {
+  const [accounts, setAccounts] = useState<TeacherAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  function refresh() {
+    setLoading(true);
+    profileApi
+      .listAccounts()
+      .then(setAccounts)
+      .catch((e) => setError(errorMessage(e)))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(refresh, []);
+
+  async function handleDownloadCv(account: TeacherAccount) {
+    try {
+      const res = await apiClient.get(profileApi.teacherCvPath(account.teacherId), { responseType: "blob" });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = account.cvFilename ?? "cv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Manage Teacher Accounts" widthClass="max-w-3xl">
+      <div className="space-y-5">
+        {error && <Alert type="error">{error}</Alert>}
+
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Create logins for new or existing teachers, and keep track of who still needs to change their temporary password.
+          </p>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <UserPlusIcon className="h-4 w-4" /> Create Account
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <Spinner className="h-5 w-5" />
+          </div>
+        ) : accounts.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-400 dark:text-slate-500">No teacher accounts yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-100 dark:border-white/10">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/[0.04] dark:text-slate-400">
+                <tr>
+                  <th className="px-4 py-2.5">Teacher</th>
+                  <th className="px-4 py-2.5">Username</th>
+                  <th className="px-4 py-2.5">Current Password</th>
+                  <th className="px-4 py-2.5">Status</th>
+                  <th className="px-4 py-2.5">CV</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/[0.08]">
+                {accounts.map((a) => (
+                  <tr key={a.teacherId}>
+                    <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-100">{a.name}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-600 dark:text-slate-300">{a.email}</td>
+                    <td className="px-4 py-2.5">
+                      {a.tempPassword ? (
+                        <TempPasswordCell password={a.tempPassword} onCopied={() => setToast("Password copied to clipboard.")} />
+                      ) : (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">Hidden — changed by teacher</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Badge tone={a.passwordChanged ? "green" : "amber"}>{a.passwordChanged ? "Password Changed" : "Password Not Changed"}</Badge>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {a.hasCv ? (
+                        <button
+                          onClick={() => handleDownloadCv(a)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline dark:text-brand-400"
+                        >
+                          <ArrowDownTrayIcon className="h-3.5 w-3.5" /> Download
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {createOpen && (
+        <CreateAccountModal
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => {
+            setCreateOpen(false);
+            refresh();
+          }}
+        />
+      )}
+
+      <Toast message={toast} type="success" onClose={() => setToast(null)} />
+    </Modal>
+  );
+}
+
+function TempPasswordCell({ password, onCopied }: { password: string; onCopied: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(password);
+    setCopied(true);
+    onCopied();
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 px-2 py-1 font-mono text-xs text-slate-700 transition-colors hover:bg-slate-100 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
+      title="Click to copy"
+    >
+      {password}
+      {copied ? <CheckIcon className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" /> : <ClipboardDocumentIcon className="h-3.5 w-3.5 text-slate-400" />}
+    </button>
+  );
+}
+
+function CreateAccountModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [cv, setCv] = useState<File | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<TeacherAccount | null>(null);
+  const [copied, setCopied] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleCreate() {
+    if (!name.trim() || !email.trim()) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const account = await profileApi.createAccount({ name: name.trim(), email: email.trim(), phone: phone.trim(), cv });
+      setCreated(account);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleCopy() {
+    if (!created?.tempPassword) return;
+    await navigator.clipboard.writeText(created.tempPassword);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Create Teacher Account" widthClass="max-w-md">
+      {created ? (
+        <div className="space-y-4">
+          <Alert type="success">Account created for {created.name}. Share these credentials with them securely.</Alert>
+          <div className="space-y-2 rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Username</p>
+              <p className="font-mono text-sm text-slate-800 dark:text-slate-100">{created.email}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Temporary Password</p>
+              <button
+                onClick={handleCopy}
+                className="mt-1 inline-flex items-center gap-2 rounded-lg bg-white px-2.5 py-1.5 font-mono text-sm text-slate-800 shadow-sm ring-1 ring-slate-200 dark:bg-navy-800 dark:text-slate-100 dark:ring-white/10"
+              >
+                {created.tempPassword}
+                {copied ? <CheckIcon className="h-4 w-4 text-teal-600 dark:text-teal-400" /> : <ClipboardDocumentIcon className="h-4 w-4 text-slate-400" />}
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={onCreated}>Done</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {error && <Alert type="error">{error}</Alert>}
+          <Field label="Full name">
+            <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ayesha Malik" />
+          </Field>
+          <Field label="Email">
+            <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="teacher@school.edu" />
+          </Field>
+          <Field label="Phone (optional)">
+            <TextInput value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +92 300 1234567" />
+          </Field>
+          <Field label="CV / Resume (optional)">
+            <input
+              ref={inputRef}
+              type="file"
+              accept="application/pdf,.doc,.docx"
+              onChange={(e) => setCv(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-brand-700 hover:file:bg-brand-100 dark:text-slate-300 dark:file:bg-brand-500/10 dark:file:text-brand-300"
+            />
+            {cv && (
+              <span className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <DocumentTextIcon className="h-3.5 w-3.5" /> {cv.name}
+              </span>
+            )}
+          </Field>
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            Assign subjects and classes afterwards from "Manage Subjects" — a temporary password will be generated automatically.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={onClose} disabled={creating}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} loading={creating} disabled={!name.trim() || !email.trim()}>
+              Create Account
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 
@@ -260,23 +626,33 @@ function ManageSubjectsModal({ onClose }: { onClose: () => void }) {
             <p className="text-sm text-slate-400 dark:text-slate-500">No subjects yet in this class.</p>
           ) : (
             <div className="divide-y divide-slate-100 rounded-lg border border-slate-100 dark:divide-white/[0.08] dark:border-white/10">
-              {subjects.map((s) => (
-                <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{s.name}</span>
-                  <Select
-                    value={s.teacherId}
-                    onChange={(e) => handleReassign(s, Number(e.target.value))}
-                    className="w-40"
-                    disabled={savingId === s.id}
-                  >
-                    {teachers.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-              ))}
+              {subjects.map((s) => {
+                // The subject's current teacher may since have been removed — show them anyway
+                // so the dropdown doesn't render blank, but every other option stays active-only.
+                const currentTeacherStillActive = teachers.some((t) => t.id === s.teacherId);
+                return (
+                  <div key={s.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{s.name}</span>
+                    <Select
+                      value={s.teacherId}
+                      onChange={(e) => handleReassign(s, Number(e.target.value))}
+                      className="w-44"
+                      disabled={savingId === s.id}
+                    >
+                      {!currentTeacherStillActive && (
+                        <option key={s.teacherId} value={s.teacherId}>
+                          {s.teacherName} (removed)
+                        </option>
+                      )}
+                      {teachers.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

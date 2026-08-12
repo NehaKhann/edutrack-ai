@@ -21,7 +21,7 @@ public class TeacherListController {
     @GetMapping("/api/teachers")
     public ApiResponse<List<TeacherSummaryResponse>> list() {
         Long schoolId = CurrentUser.get().getSchoolId();
-        List<TeacherSummaryResponse> teachers = userRepository.findBySchoolIdAndRole(schoolId, Role.TEACHER).stream()
+        List<TeacherSummaryResponse> teachers = userRepository.findBySchoolIdAndRoleAndActive(schoolId, Role.TEACHER, true).stream()
                 .sorted(Comparator.comparing(u -> u.getName()))
                 .map(TeacherSummaryResponse::from)
                 .toList();

@@ -16,14 +16,16 @@ public class AuthenticatedUser implements UserDetails {
     private final String passwordHash;
     private final Role role;
     private final String name;
+    private final boolean active;
 
-    public AuthenticatedUser(Long userId, Long schoolId, String email, String passwordHash, Role role, String name) {
+    public AuthenticatedUser(Long userId, Long schoolId, String email, String passwordHash, Role role, String name, boolean active) {
         this.userId = userId;
         this.schoolId = schoolId;
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
         this.name = name;
+        this.active = active;
     }
 
     public Long getUserId() {
@@ -74,6 +76,6 @@ public class AuthenticatedUser implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return active;
     }
 }

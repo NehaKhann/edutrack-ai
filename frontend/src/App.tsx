@@ -23,6 +23,7 @@ import { FullPageSpinner } from "./components/Spinner";
 function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
+  if (user.role === "TEACHER" && user.mustChangePassword) return <Navigate to="/teacher/profile" replace />;
   return <Navigate to={user.role === "TEACHER" ? "/teacher/lesson-plan" : "/principal/coverage"} replace />;
 }
 

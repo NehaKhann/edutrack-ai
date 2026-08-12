@@ -10,22 +10,28 @@ public record TeacherProfileResponse(
         Long teacherId,
         String name,
         String email,
+        String phone,
         String designation,
         String bio,
         boolean hasPhoto,
-        List<SubjectResponse> subjects,
-        List<TimetableSlotResponse> timetable
+        boolean hasCv,
+        String cvFilename,
+        boolean mustChangePassword,
+        List<SubjectResponse> subjects
 ) {
-    public static TeacherProfileResponse from(User teacher, TeacherProfile profile, List<SubjectResponse> subjects, List<TimetableSlotResponse> timetable) {
+    public static TeacherProfileResponse from(User teacher, TeacherProfile profile, List<SubjectResponse> subjects) {
         return new TeacherProfileResponse(
                 teacher.getId(),
                 teacher.getName(),
                 teacher.getEmail(),
+                profile != null ? profile.getPhone() : null,
                 profile != null ? profile.getDesignation() : null,
                 profile != null ? profile.getBio() : null,
                 profile != null && profile.getProfilePhotoRef() != null,
-                subjects,
-                timetable
+                profile != null && profile.getCvFileRef() != null,
+                profile != null ? profile.getCvFilename() : null,
+                teacher.getTempPassword() != null,
+                subjects
         );
     }
 }

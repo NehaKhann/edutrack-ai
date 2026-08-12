@@ -1,19 +1,18 @@
 package com.edutrack.profile.controller;
 
 import com.edutrack.common.ApiResponse;
+import com.edutrack.profile.dto.ChangePasswordRequest;
 import com.edutrack.profile.dto.TeacherProfileResponse;
 import com.edutrack.profile.dto.TeacherProfileUpdateRequest;
-import com.edutrack.profile.dto.TimetableSlotResponse;
-import com.edutrack.profile.dto.TimetableSlotUpsertRequest;
 import com.edutrack.profile.service.TeacherProfileService;
+import com.edutrack.security.CurrentUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/teacher-profiles/me")
@@ -32,6 +31,12 @@ public class TeacherProfileController {
         return ApiResponse.ok(teacherProfileService.updateMyProfile(request));
     }
 
+    @PutMapping("/password")
+    public ApiResponse<Void> changeMyPassword(@Valid @RequestBody ChangePasswordRequest request) {
+        teacherProfileService.changeMyPassword(request.currentPassword(), request.newPassword());
+        return ApiResponse.ok(null, "Password updated successfully");
+    }
+
     @PostMapping(value = "/photo", consumes = "multipart/form-data")
     public ApiResponse<TeacherProfileResponse> uploadPhoto(@RequestParam MultipartFile file) {
         return ApiResponse.ok(teacherProfileService.uploadMyPhoto(file));
@@ -39,32 +44,33 @@ public class TeacherProfileController {
 
     @GetMapping("/photo")
     public ResponseEntity<byte[]> getMyPhoto() {
-        return photoResponse(currentTeacherPhotoOwner());
+        return photoResponse(currentTeacherId());
     }
 
-    @GetMapping("/timetable")
-    public ApiResponse<List<TimetableSlotResponse>> myTimetable() {
-        return ApiResponse.ok(teacherProfileService.listMyTimetable());
+    @GetMapping("/cv")
+    public ResponseEntity<byte[]> getMyCv() {
+        return cvResponse(currentTeacherId());
     }
 
-    @PostMapping("/timetable")
-    public ApiResponse<TimetableSlotResponse> addSlot(@Valid @RequestBody TimetableSlotUpsertRequest request) {
-        return ApiResponse.ok(teacherProfileService.addSlot(request.subjectId(), request.dayOfWeek(), request.startTime(), request.endTime()));
-    }
-
-    @DeleteMapping("/timetable/{slotId}")
-    public ApiResponse<Void> deleteSlot(@PathVariable Long slotId) {
-        teacherProfileService.deleteSlot(slotId);
-        return ApiResponse.ok(null);
-    }
-
-    private Long currentTeacherPhotoOwner() {
-        return com.edutrack.security.CurrentUser.get().getUserId();
+    private Long currentTeacherId() {
+        return CurrentUser.get().getUserId();
     }
 
     private ResponseEntity<byte[]> photoResponse(Long teacherId) {
         byte[] bytes = teacherProfileService.getPhotoBytes(teacherId);
         String contentType = teacherProfileService.getPhotoContentType(teacherId);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(contentType)).body(bytes);
+    }
+
+    private ResponseEntity<byte[]> cvResponse(Long teacherId) {
+        byte[] bytes = teacherProfileService.getCvBytes(teacherId);
+        String filename = teacherProfileService.getCvFilename(teacherId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitize(filename) + "\"")
+                .body(bytes);
+    }
+
+    private String sanitize(String filename) {
+        return filename == null ? "cv" : filename.replaceAll("[\\r\\n\"]", "_");
     }
 }

@@ -38,7 +38,7 @@ public class StaffAttendanceOverviewService {
     public List<TeacherAttendanceTodayRow> today() {
         Long schoolId = CurrentUser.get().getSchoolId();
         LocalDate today = LocalDate.now();
-        List<User> teachers = userRepository.findBySchoolIdAndRole(schoolId, Role.TEACHER);
+        List<User> teachers = userRepository.findBySchoolIdAndRoleAndActive(schoolId, Role.TEACHER, true);
 
         return teachers.stream()
                 .sorted(Comparator.comparing(User::getName))

@@ -7,6 +7,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (patch: Partial<UserSummary>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -41,6 +42,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("edutrack_token");
         localStorage.removeItem("edutrack_user");
         setUser(null);
+      },
+      updateUser: (patch: Partial<UserSummary>) => {
+        setUser((prev) => {
+          if (!prev) return prev;
+          const next = { ...prev, ...patch };
+          localStorage.setItem("edutrack_user", JSON.stringify(next));
+          return next;
+        });
       },
     }),
     [user, loading]
