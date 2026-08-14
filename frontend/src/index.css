@@ -16,12 +16,12 @@ html, body, #root {
 
 body {
   @apply text-slate-900 antialiased transition-colors duration-300;
-  background: #F5F6FC;
+  background: #FAFCFA;
 }
 
 .dark body {
   @apply text-slate-100;
-  background: #0B1230;
+  background: #101410;
 }
 
 * {
@@ -37,25 +37,25 @@ body {
   }
 
   .dark .glass {
-    background: rgba(15, 23, 55, 0.66);
+    background: rgba(26, 31, 27, 0.66);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .glass-dark {
-    background: rgba(15, 27, 76, 0.55);
+    background: rgba(16, 20, 16, 0.55);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .shimmer {
-    background: linear-gradient(90deg, #E7E9F7 0%, #F3F0FF 20%, #E7E9F7 40%);
+    background: linear-gradient(90deg, #DFEFE5 0%, #F0F8F2 20%, #DFEFE5 40%);
     background-size: 800px 100%;
     @apply animate-shimmer;
   }
 
   .dark .shimmer {
-    background: linear-gradient(90deg, #1B2360 0%, #262E7A 20%, #1B2360 40%);
+    background: linear-gradient(90deg, #1A1F1B 0%, #262D27 20%, #1A1F1B 40%);
     background-size: 800px 100%;
   }
 }

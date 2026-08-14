@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.edutrackai.app",
-  appName: "EduTrack AI",
+  appName: "Metropolitan School North Campus 1",
   webDir: "dist",
   server: {
     // Points the Android app at the live deployed site, not a bundled copy —

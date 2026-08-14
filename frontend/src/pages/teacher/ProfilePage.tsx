@@ -55,7 +55,7 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="My Profile" description="How you appear to the Principal and across EduTrack AI." />
+      <PageHeader title="My Profile" description="How you appear to the Principal and across the app." />
 
       {user?.mustChangePassword && (
         <Alert type="warning">

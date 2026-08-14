@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useTheme } from "../theme/ThemeContext";
 
-const COLOR_TEAL = "#1FB3A1";
-const COLOR_CORAL = "#FF6B55";
+const COLOR_TEAL = "#2E86C1";
+const COLOR_CORAL = "#D6332B";
 const COLOR_AMBER = "#F59E0B";
-const COLOR_BRAND = "#6B5CF6";
+const COLOR_BRAND = "#1B7A3E";
 
 function useChartPalette() {
   const { theme } = useTheme();
@@ -14,7 +14,7 @@ function useChartPalette() {
     dark,
     grid: dark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.06)",
     axis: dark ? "#94A3B8" : "#64748B",
-    tooltipBg: dark ? "#101A47" : "#FFFFFF",
+    tooltipBg: dark ? "#1A1F1B" : "#FFFFFF",
     tooltipBorder: dark ? "rgba(255,255,255,0.12)" : "#E2E8F0",
     tooltipText: dark ? "#F1F5F9" : "#0F172A",
   };

@@ -80,8 +80,8 @@ export function AppLayout() {
           <AcademicCapIcon className="h-5 w-5 text-white" />
         </div>
         <div>
-          <div className="font-display text-sm font-bold leading-tight text-white">EduTrack AI</div>
-          <div className="text-[11px] text-brand-300">School Operations</div>
+          <div className="font-display text-sm font-bold leading-tight text-white">Metropolitan School</div>
+          <div className="text-[11px] text-brand-300">North Campus 1</div>
         </div>
         <button
           onClick={() => setMobileNavOpen(false)}
@@ -298,7 +298,7 @@ function NotificationBell() {
       >
         <BellIcon className="h-[17px] w-[17px]" />
         {unread > 0 && (
-          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-coral-500 shadow-[0_0_0_2px_white] dark:shadow-[0_0_0_2px_#0B1230]" />
+          <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-coral-500 shadow-[0_0_0_2px_white] dark:shadow-[0_0_0_2px_#101410]" />
         )}
       </button>
 

@@ -18,11 +18,11 @@ interface Props extends NativeButtonProps {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "group bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 text-white shadow-glow-brand ring-1 ring-inset ring-white/15 hover:shadow-[0_14px_38px_-8px_rgba(91,79,239,0.65)] focus-visible:ring-brand-500 disabled:from-brand-300 disabled:to-brand-300 disabled:shadow-none disabled:ring-0",
+    "group bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 text-white shadow-glow-brand ring-1 ring-inset ring-white/15 hover:shadow-[0_14px_38px_-8px_rgba(21,102,51,0.65)] focus-visible:ring-brand-500 disabled:from-brand-300 disabled:to-brand-300 disabled:shadow-none disabled:ring-0",
   secondary:
     "bg-white/80 text-slate-700 border border-slate-200 backdrop-blur-sm hover:bg-white hover:shadow-md focus-visible:ring-brand-500 shadow-sm disabled:text-slate-400 dark:bg-white/[0.08] dark:text-slate-200 dark:border-white/10 dark:hover:bg-white/[0.12]",
   danger:
-    "bg-gradient-to-br from-coral-600 to-coral-500 text-white shadow-glow-coral hover:shadow-[0_10px_30px_-6px_rgba(255,107,85,0.6)] focus-visible:ring-coral-500 disabled:from-coral-100 disabled:to-coral-100 disabled:shadow-none",
+    "bg-gradient-to-br from-coral-600 to-coral-500 text-white shadow-glow-coral hover:shadow-[0_10px_30px_-6px_rgba(214,51,43,0.6)] focus-visible:ring-coral-500 disabled:from-coral-100 disabled:to-coral-100 disabled:shadow-none",
   ghost: "bg-transparent text-slate-600 hover:bg-slate-100 focus-visible:ring-brand-500 dark:text-slate-300 dark:hover:bg-white/[0.08]",
 };
 

@@ -67,7 +67,7 @@ export function LoginPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 shadow-glow-teal ring-1 ring-inset ring-white/20 backdrop-blur-sm">
             <AcademicCapIcon className="h-6 w-6 text-white" />
           </div>
-          <span className="font-display text-lg font-bold">EduTrack AI</span>
+          <span className="font-display text-lg font-bold">Metropolitan School</span>
         </motion.div>
 
         {/* Compact tagline — mobile hero only */}
@@ -77,7 +77,7 @@ export function LoginPage() {
           transition={{ duration: 0.5, delay: 0.1 }}
           className="relative z-10 mt-4 max-w-xs text-sm text-brand-100/90 lg:hidden"
         >
-          Syllabus, tests, grading, and analytics &mdash; all connected.
+          Syllabus planning, attendance, and daily operations &mdash; all connected.
         </motion.p>
 
         {/* Full headline — desktop only */}
@@ -88,18 +88,18 @@ export function LoginPage() {
           className="relative z-10 hidden lg:block"
         >
           <h1 className="font-display text-3xl font-bold leading-tight tracking-tight">
-            Run your school's term end-to-end &mdash; syllabus, tests, grading, and analytics, all connected.
+            Run the term end-to-end &mdash; syllabus, attendance, and daily operations, all connected.
           </h1>
           <p className="mt-4 max-w-md text-brand-100/90">
-            AI drafts, your staff approve. Built for real classrooms, not enterprise budgets.
+            AI helps plan the syllabus, teachers log attendance and diary entries, and the Principal sees it all in real time.
           </p>
         </motion.div>
 
-        <p className="relative z-10 hidden text-sm text-brand-200 lg:block">&copy; {new Date().getFullYear()} EduTrack AI</p>
+        <p className="relative z-10 hidden text-sm text-brand-200 lg:block">&copy; {new Date().getFullYear()} Metropolitan School North Campus 1</p>
       </div>
 
       {/* Form panel — overlaps the hero as a rounded sheet on mobile */}
-      <div className="relative z-10 -mt-8 flex w-full flex-1 flex-col items-center rounded-t-[2rem] bg-[#F5F6FC] px-6 pb-10 pt-8 dark:bg-navy-900 lg:mt-0 lg:w-1/2 lg:justify-center lg:rounded-none lg:px-8 lg:py-12">
+      <div className="relative z-10 -mt-8 flex w-full flex-1 flex-col items-center rounded-t-[2rem] bg-[#FAFCFA] px-6 pb-10 pt-8 dark:bg-navy-900 lg:mt-0 lg:w-1/2 lg:justify-center lg:rounded-none lg:px-8 lg:py-12">
         <div className="absolute right-5 top-5 lg:right-8 lg:top-8">
           <ThemeToggle />
         </div>
@@ -177,7 +177,7 @@ export function LoginPage() {
           )}
 
           <p className="mt-6 text-center text-[11px] text-slate-400 dark:text-slate-500 lg:hidden">
-            &copy; {new Date().getFullYear()} EduTrack AI
+            &copy; {new Date().getFullYear()} Metropolitan School North Campus 1
           </p>
         </motion.div>
       </div>

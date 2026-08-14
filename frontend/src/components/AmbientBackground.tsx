@@ -14,7 +14,7 @@ export function AmbientBackground({ className }: { className?: string }) {
     if (!ctx) return;
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const colors = ["91,79,239", "31,179,161", "255,107,85"];
+    const colors = ["21,102,51", "46,134,193", "214,51,43"];
     let width = 0;
     let height = 0;
     let raf = 0;
