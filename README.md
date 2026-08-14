@@ -1,20 +1,25 @@
 # EduTrack AI
 
-An AI-powered school operations platform that mirrors a real school term end-to-end — syllabus planning, AI-assisted test generation, handwritten grading, and performance analytics — built on a free/open-source stack so it's realistic for a resource-constrained school to actually run.
+An AI-powered school operations platform that mirrors a real school term end-to-end — syllabus planning, attendance, class diary, teacher leave management, and performance tracking — built on a free/open-source stack so it's realistic for a resource-constrained school to actually run.
 
-This repo currently implements **Pillar 1 — Syllabus Planning & Pacing Tracker**, an integrated **Teacher Profiles** feature, and the shared foundation (auth, roles, LLM abstraction, PDF export pipeline) that the remaining pillars build on. See [What's implemented](#whats-implemented) below for the full breakdown.
+**Live**: deployed and running at [edutrack-ai.n-nehakhan333.workers.dev](https://edutrack-ai.n-nehakhan333.workers.dev), installable as a mobile app (PWA today, native Android in progress — see [Deployment](#deployment)).
+
+See [What's implemented](#whats-implemented) below for the full feature breakdown, and [TESTING.md](TESTING.md) for a role-by-role QA flow guide (e.g. "Teacher marks attendance → Principal sees it").
 
 ## Tech stack
 
 | Layer | Choice |
 |---|---|
 | Backend | Spring Boot 3 (Java 17), Spring Security + JWT, Spring Data JPA, Flyway migrations |
-| Frontend | React 18 + TypeScript (Vite), Tailwind CSS, Framer Motion |
-| Database | PostgreSQL (local via Docker; Neon/Supabase-compatible in production) |
+| Frontend | React 18 + TypeScript (Vite), Tailwind CSS, Framer Motion, installable PWA (`vite-plugin-pwa`) |
+| Mobile | Capacitor Android wrapper pointed at the live deployed URL — feature/content updates ship instantly with no app rebuild; only native-level changes (icon, name, native plugins) need a new build |
+| Database | PostgreSQL — local via Docker in dev, [Neon](https://neon.tech) (free serverless Postgres) in production |
 | LLM | [Groq](https://groq.com) (hosted, free tier) in production, [Ollama](https://ollama.com) (local) in dev — switched purely via the `LLM_PROVIDER` env var, no code changes between environments |
-| Document/OCR | Apache PDFBox (PDF), Apache POI (DOC/DOCX), Tesseract via Tess4j (image OCR) |
+| File storage | Local disk in dev, [Cloudflare R2](https://developers.cloudflare.com/r2/) (free tier, S3-compatible) in production — switched purely via the `STORAGE_PROVIDER` env var. Needed because most free app hosts (e.g. Render) wipe local disk on every redeploy; R2 doesn't. |
+| Document/OCR | Apache PDFBox (PDF), Apache POI (DOC/DOCX), Tesseract via Tess4j (image OCR, English + Urdu) |
+| Face recognition | face-api.js (browser-side) for optional face-verified teacher self-attendance, with a manual fallback |
 | PDF export | openhtmltopdf + Thymeleaf HTML templates |
-| File storage | Local disk in dev (pluggable `FileStorageService` interface for swapping to Cloudinary/Supabase Storage in production) |
+| Hosting | [Cloudflare Pages/Workers](https://developers.cloudflare.com/workers/) (frontend, static), [Render](https://render.com) (backend, Docker) — both free tier |
 
 ## Running it locally
 
@@ -62,7 +67,9 @@ The database auto-migrates and seeds demo data on first boot. Sign in with any o
 | `GROQ_API_KEY` / `GROQ_MODEL` | Groq API access | unused | Required when `LLM_PROVIDER=groq` |
 | `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Local LLM | `host.docker.internal:11434` | unused |
 | `CORS_ALLOWED_ORIGINS` | Allowed frontend origin(s) | `http://localhost:5174` | Your deployed frontend URL |
-| `STORAGE_BASE_PATH` | Where uploaded files land | `./storage` (container volume) | Swap `FileStorageService` implementation for object storage before deploying — local disk doesn't persist on most free hosting tiers |
+| `STORAGE_PROVIDER` | `local` or `r2` | `local` | Set to `r2` — local disk doesn't persist across redeploys on most free hosts |
+| `STORAGE_BASE_PATH` | Where uploaded files land when `STORAGE_PROVIDER=local` | `./storage` (container volume) | unused when `STORAGE_PROVIDER=r2` |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY` / `R2_SECRET_KEY` / `R2_BUCKET` | Cloudflare R2 credentials | unused | Required when `STORAGE_PROVIDER=r2` |
 | `OCR_TESSDATA_PATH` | Tesseract language data path | set by the backend Dockerfile | Same, if using a different base image |
 | `SEED_ENABLED` | Seed demo school on empty DB | `true` | Set to `false` once real data exists |
 | `VITE_API_BASE_URL` | Frontend → backend URL | `http://localhost:8080` | Your deployed backend URL |
@@ -71,7 +78,11 @@ None of these are hardcoded with production-breaking defaults — every default 
 
 ## What's implemented
 
-**Foundation**: JWT auth, TEACHER/PRINCIPAL/ADMIN roles, multi-tenant school/class/subject data model, env-switchable LLM client (Groq/Ollama), server-side PDF export pipeline, responsive app shell with a mobile drawer nav.
+**Foundation**: JWT auth, TEACHER/PRINCIPAL/ADMIN roles, multi-tenant school data model (School → Class Section → Subject, with a Student roster per class), env-switchable LLM client (Groq/Ollama) and file storage (local disk/R2), server-side PDF export pipeline, responsive app shell with a mobile drawer nav, installable PWA, in-app notifications, and global cross-entity search scoped to each school.
+
+**Teacher Account Management** (Principal-only): create teacher accounts with an auto-generated temporary password and optional CV upload, forcing a password change on first login (no self-registration exists anywhere in the app — every account is provisioned this way); deactivate/reactivate accounts.
+
+**Class / Section / Subject management**: Principal creates Class Sections (e.g. "Grade 6 – A") and Subjects within them, assigning one or more subjects to a teacher (including one teacher across multiple classes/subjects).
 
 **Pillar 1 — Syllabus Planning & Pacing**:
 - **Upload → Review/Edit → Confirm → Plan**, a deliberate multi-step flow rather than "upload and hope": upload one or more scanned/typed documents at once (PDF, Word .doc/.docx, or a photo/scan JPG/PNG/WebP — images go through Tesseract OCR in English + Urdu, PDFs with no real text layer are automatically rendered page-by-page and OCR'd too), see the extracted text exactly as pulled from each file, hand-correct anything wrong, then explicitly **Confirm** the syllabus. A second **Planning** tab — where AI topic extraction and the week/month topic list live — stays locked until that confirmation happens, both in the UI and enforced server-side (the extraction endpoint itself rejects an unconfirmed syllabus, so it's a real gate, not just a frontend affordance). Uploading multiple files reports partial success — one unreadable file in a batch doesn't block the rest.
@@ -90,7 +101,20 @@ None of these are hardcoded with production-breaking defaults — every default 
 - Editable per-date calendar, not just a fixed weekly pattern: the Principal can click any date and toggle it Working/Off (with an optional reason), bulk-apply a status across a date range or a specific weekday (e.g. "all Saturdays this term"), and reset any date back to its default. Only real exceptions are stored — a date matching the school's default weekly pattern is never persisted as its own row — with a who/when audit trail on every active override.
 - Wired directly into the scheduling logic, not just cosmetic: "Today's Plan" never auto-suggests a topic on a non-teaching day, and missed-lesson auto-reschedule skips over them to land on the next real teaching day — including a weekend that's been explicitly marked as a working day.
 
-Not yet built: Pillars 2–7 (AI test generation, handwritten grading, analytics, feedback loop, head-of-school reporting) and the Student/Parent portals (explicitly out of scope per the product spec). Live deployment is prepared for but not yet executed — see [Deployment](#deployment).
+**Student Attendance**:
+- Principal- or Teacher-managed student roster per class section (name + roll number), so a Teacher can build their own class list rather than depending entirely on the Principal.
+- Teacher marks daily or period-wise attendance (Present/Absent/Late/Leave) for a class; Principal's Attendance Dashboard shows a real-time per-class summary (marked/not-marked, present/absent/late counts, attendance %) with a drill-down to the exact per-student record.
+
+**Teacher Attendance, Leave & Class-Skip Reporting**:
+- Teacher marks their own daily attendance manually, or via **face recognition** (enroll once, then verify with the camera — manual entry remains available as a fallback).
+- Teacher applies for leave (type, date range, reason, optional supporting document) and reports a skipped class (subject/date/period/reason, optional substitute).
+- Principal's Teacher Attendance dashboard surfaces an alert banner (e.g. absent-without-leave), a same-day overview per teacher, and a detail view with full leave history and a monthly attendance summary; Principal approves/rejects leave requests directly.
+
+**Class Diary / Homework**:
+- Teacher logs a daily diary entry per subject (content, optional page reference, due date, optional attachment).
+- Principal's Diary Overview shows, per class/date, which subjects have submitted vs. not — filterable by class, teacher, and subject.
+
+Not yet built: AI test generation, handwritten grading, and a feedback-loop/head-of-school reporting pillar beyond the existing Coverage Grid — plus Student/Parent portals (explicitly out of scope per the product spec).
 
 ### Known limitations (verified against real school syllabi, not hypothetical)
 
@@ -100,70 +124,34 @@ Tested directly against real phone-photographed syllabus pages (English and Urdu
 - **Multi-column layouts** (e.g. a Math syllabus with separate Arithmetic/Algebra/Geometry columns per month) sometimes get their columns cross-contaminated in the extracted text, since OCR and PDF text extraction both flatten a 2D table into a 1D text stream — the AI does its best with what it's given, but occasionally merges two adjacent columns' content into one garbled title.
 - **Local Ollama models (llama3.2 3B) are noticeably less reliable than a larger hosted model** at consistently picking week-mode vs. month-mode, and at avoiding occasional malformed JSON — both are mitigated (retries, sanity-clamping) but not eliminated. Production `LLM_PROVIDER=groq` should perform meaningfully better on all of the above since Groq's models are far larger.
 
-## Test scenarios (manual QA checklist)
+## Testing
 
-**Responsiveness**
-- [ ] Resize the browser from ~375px (mobile) through ~820px (tablet) to desktop on every page — sidebar becomes a slide-in drawer with backdrop below `md` (768px); no horizontal page overflow; tables scroll independently instead of breaking layout.
-- [ ] On mobile, open the drawer via the hamburger icon, navigate to another page, confirm it auto-closes.
-
-**Auth & roles**
-- [ ] Log in as Teacher and Principal; confirm each only sees their own nav items and cannot reach the other's routes directly by URL.
-- [ ] Confirm a Teacher's JWT is rejected on `/api/principal/**` endpoints (403).
-
-**Syllabus upload → review → confirm → plan**
-- [ ] Click "New Syllabus", select 2-3 files at once (mix PDF/.docx/image types) → each appears as its own editable card with the text actually extracted from that file.
-- [ ] Include one unsupported file (e.g. `.txt`) in a batch with good files → the good ones still upload; the bad one is reported by name with a reason, nothing silently fails.
-- [ ] Edit a card's text and save → persists on reload.
-- [ ] Delete a card → removed from the list.
-- [ ] Click the "Planning" tab before confirming → blocked with a clear message, tab shows a lock icon.
-- [ ] Click "Confirm Syllabus" → Planning unlocks automatically; documents become read-only with a "✓ Confirmed" badge.
-- [ ] Click "Edit again" → Planning re-locks, documents become editable again, nothing already extracted is deleted.
-- [ ] In Planning, click "Extract with AI" → topics generated from the (possibly hand-edited) confirmed text, spanning all uploaded documents combined.
-- [ ] Manually add, edit, reorder, and delete a topic.
-- [ ] Via curl/Postman, call `POST /api/syllabus/{id}/extract-topics` directly on an unconfirmed syllabus → confirm it's rejected server-side (400), proving the gate isn't just a frontend affordance.
-
-**Lesson planning**
-- [ ] Confirm a lesson "Covered as planned" → topic marked covered.
-- [ ] Confirm a lesson "Not delivered" with a reason → it appears as Missed, and a new Rescheduled entry appears on a later date.
-
-**Principal Coverage Grid**
-- [ ] Grid shows correct planned/covered counts and status per Class × Subject.
-- [ ] Click a row → detail modal shows topics and missed/rescheduled history.
-- [ ] Export PDF → downloads a correctly formatted report.
-
-**Teacher Profiles**
-- [ ] As a Teacher, upload a profile photo (JPG/PNG/WebP), set designation + bio, save, reload — everything persists and the photo renders.
-- [ ] Add and delete timetable slots (with and without a linked subject).
-- [ ] As Principal, open the Teacher Directory, confirm both teachers appear with correct photos/designations/subject counts, and their detail view matches what each teacher set.
-- [ ] Confirm one teacher cannot edit another's profile (there is no cross-teacher write endpoint — only `/me`).
-
-**School Calendar**
-- [ ] As Principal, open Calendar, add a holiday spanning a few days → it renders on the month grid with its name.
-- [ ] Toggle weekend days (e.g. switch to Sunday-only) → grid updates immediately.
-- [ ] As Teacher, open Calendar → same data, but no "Add holiday" button or weekend toggle (read-only).
-- [ ] On a weekend or holiday date, "Today's Plan" shows "No school today" instead of auto-suggesting a topic (test via a subject with an active syllabus, checking a known off day).
-- [ ] Confirm a lesson as "Not delivered" right before a weekend/holiday → the auto-rescheduled entry lands on the next real school day, skipping over both.
-
-**Env-driven config**
-- [ ] Confirm `.env` is git-ignored and never committed.
-- [ ] Confirm the app starts with either `LLM_PROVIDER=ollama` or `LLM_PROVIDER=groq` without any code changes.
+See **[TESTING.md](TESTING.md)** for the full manual QA guide — organized as real cross-role flows (e.g. "Teacher marks attendance → switch to Principal → confirm it shows up correctly") rather than isolated per-feature checks, since that's the failure mode that matters most in a two-sided school app.
 
 ## Deployment
 
-Not yet deployed. The codebase is deployment-ready (Dockerfiles for the backend, env-var-driven config throughout, no hardcoded local-only values), but live deployment needs:
-- A Postgres host (Neon/Supabase/etc.)
-- A backend host (Render/Railway/etc.)
-- A frontend host (Vercel/Netlify/etc.) or served as a static build from the same backend host
-- Object storage for uploaded files (syllabi, profile photos) if the host's disk isn't persistent
-- A Groq API key for production LLM calls
+**Live now**, on an all-free-tier stack:
 
-This section will be filled in with live URLs once deployment happens.
+| Piece | Provider |
+|---|---|
+| Frontend | [Cloudflare Pages/Workers](https://developers.cloudflare.com/workers/) — static build, deployed via Wrangler (`frontend/wrangler.toml`) |
+| Backend | [Render](https://render.com) — Docker web service (free tier: cold starts after ~15 min idle, that's expected) |
+| Database | [Neon](https://neon.tech) — free serverless Postgres (suspends when idle; first request after suspend is slower) |
+| File storage | [Cloudflare R2](https://developers.cloudflare.com/r2/) — S3-compatible, needed because Render's disk is wiped on every redeploy |
+| LLM | [Groq](https://groq.com) — free tier, `LLM_PROVIDER=groq` |
+
+**Live URL**: https://edutrack-ai.n-nehakhan333.workers.dev
+
+No self-registration exists anywhere in the app — the Principal account is provisioned once directly in the database, and every Teacher account after that is created from inside the app by the Principal.
+
+**Mobile app**: installable today as a PWA (Add to Home Screen, on Android or iPhone, no store needed). A native Android build also exists (`frontend/android/`, via [Capacitor](https://capacitorjs.com)) — it wraps the same live URL rather than bundling a static copy, so every deploy shows up in the app immediately with no rebuild. Only a genuinely native change (icon, app name, a native-only plugin) needs a new APK build. iOS is blocked on needing a Mac (or a paid cloud Mac CI) to build — not yet done.
 
 ## Project layout
 
 ```
-backend/    Spring Boot API — see src/main/java/com/edutrack/{syllabus,profile,llm,pdf,security,org}
-frontend/   React app — see src/pages/{teacher,principal}
+backend/    Spring Boot API — see src/main/java/com/edutrack/{syllabus,attendance,staffattendance,diary,calendar,face,notification,profile,llm,pdf,storage,security,org}
+frontend/   React app — see src/pages/{teacher,principal}; android/ is the Capacitor-generated native Android project
 docker-compose.yml
 .env.example
+TESTING.md
 ```
