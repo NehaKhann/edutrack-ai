@@ -9,7 +9,6 @@ import {
   BookOpenIcon,
   Squares2X2Icon,
   ArrowRightStartOnRectangleIcon,
-  AcademicCapIcon,
   UserCircleIcon,
   UsersIcon,
   MagnifyingGlassIcon,
@@ -76,8 +75,8 @@ export function AppLayout() {
   const sidebarContent = (
     <>
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-teal-500 shadow-glow-brand">
-          <AcademicCapIcon className="h-5 w-5 text-white" />
+        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-white shadow-glow-brand">
+          <img src="/icons/icon-192.png" alt="" className="h-full w-full object-cover" />
         </div>
         <div>
           <div className="font-display text-sm font-bold leading-tight text-white">Metropolitan School</div>

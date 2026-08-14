@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  AcademicCapIcon,
   EnvelopeIcon,
   LockClosedIcon,
   ClipboardDocumentIcon,
@@ -64,8 +63,8 @@ export function LoginPage() {
           transition={{ duration: 0.5 }}
           className="relative z-10 flex items-center gap-3"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 shadow-glow-teal ring-1 ring-inset ring-white/20 backdrop-blur-sm">
-            <AcademicCapIcon className="h-6 w-6 text-white" />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white shadow-glow-teal ring-1 ring-inset ring-white/20">
+            <img src="/icons/icon-192.png" alt="" className="h-full w-full object-cover" />
           </div>
           <span className="font-display text-lg font-bold">Metropolitan School</span>
         </motion.div>
