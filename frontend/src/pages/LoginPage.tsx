@@ -7,6 +7,8 @@ import {
   LockClosedIcon,
   ClipboardDocumentIcon,
   CheckIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { useAuth } from "../auth/AuthContext";
@@ -28,6 +30,7 @@ export function LoginPage() {
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -138,13 +141,21 @@ export function LoginPage() {
               <div className="relative">
                 <LockClosedIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
                 <TextInput
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-10"
+                  className="pl-10 pr-10"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                </button>
               </div>
             </Field>
             <Button type="submit" size="lg" className="w-full tracking-wide" loading={loading}>
@@ -152,16 +163,18 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-2xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Demo accounts <span className="font-normal text-slate-400 normal-case dark:text-slate-500">&middot; password: Password123!</span>
-            </p>
-            <div className="mt-2.5 space-y-1">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <DemoAccountRow key={acc.email} role={acc.role} email={acc.email} />
-              ))}
+          {import.meta.env.DEV && (
+            <div className="mt-6 rounded-2xl border border-slate-200/70 bg-white/70 p-4 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Demo accounts <span className="font-normal text-slate-400 normal-case dark:text-slate-500">&middot; password: Password123!</span>
+              </p>
+              <div className="mt-2.5 space-y-1">
+                {DEMO_ACCOUNTS.map((acc) => (
+                  <DemoAccountRow key={acc.email} role={acc.role} email={acc.email} />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <p className="mt-6 text-center text-[11px] text-slate-400 dark:text-slate-500 lg:hidden">
             &copy; {new Date().getFullYear()} EduTrack AI
