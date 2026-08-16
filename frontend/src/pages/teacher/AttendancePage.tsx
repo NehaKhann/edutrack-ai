@@ -495,7 +495,9 @@ export function AttendancePage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{s.name}</p>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500">Roll No. {s.rollNumber}</p>
+                      <span className="mt-1 inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                        Roll No. {s.rollNumber}
+                      </span>
                     </div>
                     <StatusButtonGroup value={status} onChange={(v) => setMarks((m) => ({ ...m, [s.studentId]: v }))} />
                   </div>
@@ -630,7 +632,9 @@ function RosterModal({
             <div key={s.id} className="flex items-center justify-between gap-3 py-2">
               <div>
                 <p className="text-sm font-medium text-slate-800 dark:text-slate-100">{s.name}</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">Roll No. {s.rollNumber}</p>
+                <span className="mt-1 inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-slate-700 dark:bg-white/10 dark:text-slate-200">
+                  Roll No. {s.rollNumber}
+                </span>
               </div>
               <button
                 onClick={() => setDeleteTarget(s)}
