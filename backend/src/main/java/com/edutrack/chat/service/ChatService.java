@@ -231,6 +231,9 @@ public class ChatService {
     }
 
     private String previewFor(ChatMessage m) {
+        if (m.getDeletedAt() != null) {
+            return "This message was deleted";
+        }
         if (m.getType() != ChatMessageType.TEXT && m.getContent() != null && !m.getContent().isBlank()) {
             return m.getContent();
         }
@@ -240,6 +243,55 @@ public class ChatService {
             case DOCUMENT -> m.getMimeType() != null && m.getMimeType().startsWith("video/") ? "Video" : "Document";
             case VOICE -> "Voice message";
         };
+    }
+
+    /** "Delete for everyone" -- only the sender can, and it actually clears content/file, not just a hidden flag. */
+    @Transactional
+    public void deleteMessage(Long conversationId, Long messageId) {
+        requireParticipant(conversationId);
+        ChatMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> ApiException.notFound("Message not found"));
+        if (!message.getConversation().getId().equals(conversationId)) {
+            throw ApiException.notFound("Message not found");
+        }
+        Long myId = CurrentUser.get().getUserId();
+        if (!message.getSender().getId().equals(myId)) {
+            throw ApiException.forbidden("You can only delete your own messages");
+        }
+        if (message.getDeletedAt() != null) {
+            return;
+        }
+
+        String oldFileRef = message.getFileRef();
+        message.setDeletedAt(Instant.now());
+        message.setContent(null);
+        message.setFileRef(null);
+        message.setFileName(null);
+        message.setFileSize(null);
+        message.setMimeType(null);
+        message.setDurationSeconds(null);
+        messageRepository.save(message);
+        if (oldFileRef != null) {
+            fileStorageService.delete(oldFileRef);
+        }
+
+        ChatConversation conversation = message.getConversation();
+        MessageResponse deletedResponse = MessageResponse.from(message);
+        for (ChatParticipant p : participantRepository.findByConversationId(conversationId)) {
+            if (p.getUser().getId().equals(myId)) continue;
+            messagingTemplate.convertAndSendToUser(p.getUser().getEmail(), "/queue/chat-messages", deletedResponse);
+            messagingTemplate.convertAndSendToUser(
+                    p.getUser().getEmail(), "/queue/chat-updates", buildConversationResponse(conversation, p.getUser().getId()));
+        }
+    }
+
+    /** Removes the conversation from just the caller's own list ("delete chat for me") -- the other
+     * participant(s) and the message history are untouched. Messaging the same person again starts fresh
+     * via startDirect's find-or-create, which re-adds the caller as a participant. */
+    @Transactional
+    public void deleteConversation(Long conversationId) {
+        ChatParticipant participant = requireParticipant(conversationId);
+        participantRepository.delete(participant);
     }
 
     @Transactional

@@ -79,6 +79,18 @@ public class ChatController {
         return ApiResponse.ok(null);
     }
 
+    @DeleteMapping("/conversations/{conversationId}/messages/{messageId}")
+    public ApiResponse<Void> deleteMessage(@PathVariable Long conversationId, @PathVariable Long messageId) {
+        chatService.deleteMessage(conversationId, messageId);
+        return ApiResponse.ok(null);
+    }
+
+    @DeleteMapping("/conversations/{id}")
+    public ApiResponse<Void> deleteConversation(@PathVariable Long id) {
+        chatService.deleteConversation(id);
+        return ApiResponse.ok(null);
+    }
+
     @GetMapping("/unread-count")
     public ApiResponse<Map<String, Long>> unreadCount() {
         return ApiResponse.ok(Map.of("count", chatService.unreadCount()));

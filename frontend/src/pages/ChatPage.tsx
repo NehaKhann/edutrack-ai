@@ -13,6 +13,7 @@ import { EmptyState } from "../components/EmptyState";
 import { ConversationList } from "../components/chat/ConversationList";
 import { MessageThread } from "../components/chat/MessageThread";
 import { NewChatModal } from "../components/chat/NewChatModal";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { ChatBubbleLeftRightIcon } from "@heroicons/react/24/outline";
 
 const CONVERSATIONS_POLL_MS = 15000;
@@ -25,6 +26,8 @@ export function ChatPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Conversation | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const refreshConversations = useCallback(() => {
     return chatApi
@@ -81,6 +84,21 @@ export function ChatPage() {
     setSelectedId(conversation.id);
   }
 
+  async function handleConfirmDeleteConversation() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await chatApi.deleteConversation(deleteTarget.id);
+      setConversations((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      if (selectedId === deleteTarget.id) setSelectedId(null);
+      setDeleteTarget(null);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (!user) return null;
 
   return (
@@ -99,6 +117,7 @@ export function ChatPage() {
             selectedId={selectedId}
             onSelect={(c) => setSelectedId(c.id)}
             onNewChat={() => setModalOpen(true)}
+            onDelete={setDeleteTarget}
             loading={loading}
           />
         </div>
@@ -127,6 +146,21 @@ export function ChatPage() {
 
       <NewChatModal open={modalOpen} onClose={() => setModalOpen(false)} onCreated={handleCreated} />
       <Toast message={error} type="error" onClose={() => setError(null)} />
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete this chat?"
+        message={
+          <>
+            This removes <strong>{deleteTarget?.displayName}</strong> from your chat list. It won't be deleted for the other
+            {deleteTarget?.type === "GROUP" ? " participants" : " person"} — messaging them again starts a fresh conversation.
+          </>
+        }
+        confirmLabel="Delete chat"
+        loading={deleting}
+        onConfirm={handleConfirmDeleteConversation}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

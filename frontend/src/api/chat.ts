@@ -49,6 +49,14 @@ export function markRead(conversationId: number): Promise<void> {
   return unwrap(apiClient.post(`/api/chat/conversations/${conversationId}/read`));
 }
 
+export function deleteMessage(conversationId: number, messageId: number): Promise<void> {
+  return unwrap(apiClient.delete(`/api/chat/conversations/${conversationId}/messages/${messageId}`));
+}
+
+export function deleteConversation(conversationId: number): Promise<void> {
+  return unwrap(apiClient.delete(`/api/chat/conversations/${conversationId}`));
+}
+
 export function unreadCount(): Promise<{ count: number }> {
   return unwrap(apiClient.get("/api/chat/unread-count"));
 }

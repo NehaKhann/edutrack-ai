@@ -177,7 +177,9 @@ export function DiaryPage() {
 
       {error && (
         <div className="mb-4">
-          <Alert type="error">{error}</Alert>
+          <Alert type="error" onClose={() => setError(null)}>
+            {error}
+          </Alert>
         </div>
       )}
 

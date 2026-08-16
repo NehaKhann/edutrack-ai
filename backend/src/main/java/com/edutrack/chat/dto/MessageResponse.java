@@ -16,14 +16,17 @@ public record MessageResponse(
         Long fileSize,
         String mimeType,
         Integer durationSeconds,
-        Instant createdAt
+        Instant createdAt,
+        boolean deleted
 ) {
+    // A deleted message already has its content/file fields cleared in the DB (see
+    // ChatService.deleteMessage), so this just passes through whatever's left -- no extra redaction needed.
     public static MessageResponse from(ChatMessage m) {
         return new MessageResponse(
                 m.getId(), m.getConversation().getId(), m.getSender().getId(), m.getSender().getName(),
                 m.getType().name(), m.getContent(),
                 m.getFileRef() != null, m.getFileName(), m.getFileSize(), m.getMimeType(), m.getDurationSeconds(),
-                m.getCreatedAt()
+                m.getCreatedAt(), m.getDeletedAt() != null
         );
     }
 }

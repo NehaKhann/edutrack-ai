@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { PlusIcon, UserGroupIcon, UserCircleIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, UserGroupIcon, UserCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
 import type { Conversation } from "../../types/chat";
 import { EmptyState } from "../EmptyState";
 import { SkeletonRows } from "../Skeleton";
@@ -30,12 +30,14 @@ export function ConversationList({
   selectedId,
   onSelect,
   onNewChat,
+  onDelete,
   loading,
 }: {
   conversations: Conversation[];
   selectedId: number | null;
   onSelect: (conv: Conversation) => void;
   onNewChat: () => void;
+  onDelete: (conv: Conversation) => void;
   loading: boolean;
 }) {
   return (
@@ -71,35 +73,48 @@ export function ConversationList({
           </div>
         ) : (
           conversations.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onSelect(c)}
-              className={clsx(
-                "flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors dark:border-white/[0.05]",
-                selectedId === c.id ? "bg-brand-50 dark:bg-brand-500/[0.08]" : "hover:bg-slate-50 dark:hover:bg-white/[0.04]"
-              )}
-            >
-              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-sm font-bold text-white">
-                {c.type === "GROUP" ? <UserGroupIcon className="h-5 w-5" /> : initialsOf(c.displayName) || <UserCircleIcon className="h-5 w-5" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{c.displayName}</span>
-                  <span className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">{shortTime(c.lastMessageAt)}</span>
+            <div key={c.id} className="group relative">
+              <button
+                type="button"
+                onClick={() => onSelect(c)}
+                className={clsx(
+                  "flex w-full items-center gap-3 border-b border-slate-100 py-3 pl-4 pr-11 text-left transition-colors dark:border-white/[0.05]",
+                  selectedId === c.id ? "bg-brand-50 dark:bg-brand-500/[0.08]" : "hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                )}
+              >
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-sm font-bold text-white">
+                  {c.type === "GROUP" ? <UserGroupIcon className="h-5 w-5" /> : initialsOf(c.displayName) || <UserCircleIcon className="h-5 w-5" />}
                 </div>
-                <div className="mt-0.5 flex items-center justify-between gap-2">
-                  <span className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    {c.lastMessagePreview ?? "No messages yet"}
-                  </span>
-                  {c.unreadCount > 0 && (
-                    <span className="grid h-5 min-w-[1.25rem] shrink-0 place-items-center rounded-full bg-coral-500 px-1.5 text-[10px] font-bold text-white">
-                      {c.unreadCount > 99 ? "99+" : c.unreadCount}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{c.displayName}</span>
+                    <span className="shrink-0 text-[11px] text-slate-400 dark:text-slate-500">{shortTime(c.lastMessageAt)}</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center justify-between gap-2">
+                    <span className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {c.lastMessagePreview ?? "No messages yet"}
                     </span>
-                  )}
+                    {c.unreadCount > 0 && (
+                      <span className="grid h-5 min-w-[1.25rem] shrink-0 place-items-center rounded-full bg-coral-500 px-1.5 text-[10px] font-bold text-white">
+                        {c.unreadCount > 99 ? "99+" : c.unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(c);
+                }}
+                aria-label="Delete chat"
+                title="Delete chat"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-300 opacity-0 transition-opacity hover:bg-coral-50 hover:text-coral-600 focus-visible:opacity-100 group-hover:opacity-100 dark:text-slate-600 dark:hover:bg-coral-500/15 dark:hover:text-coral-400"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            </div>
           ))
         )}
       </div>

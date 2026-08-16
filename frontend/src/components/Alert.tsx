@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import type { ReactNode } from "react";
-import { ExclamationTriangleIcon, CheckCircleIcon } from "@heroicons/react/24/solid";
+import { ExclamationTriangleIcon, CheckCircleIcon, XMarkIcon } from "@heroicons/react/24/solid";
 
 type AlertType = "error" | "success" | "warning";
 
@@ -10,7 +10,21 @@ const toneClasses: Record<AlertType, string> = {
   warning: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300",
 };
 
-export function Alert({ type = "error", children }: { type?: AlertType; children: ReactNode }) {
+const dismissClasses: Record<AlertType, string> = {
+  error: "hover:bg-coral-100 dark:hover:bg-coral-500/20",
+  success: "hover:bg-teal-100 dark:hover:bg-teal-500/20",
+  warning: "hover:bg-amber-100 dark:hover:bg-amber-500/20",
+};
+
+export function Alert({
+  type = "error",
+  children,
+  onClose,
+}: {
+  type?: AlertType;
+  children: ReactNode;
+  onClose?: () => void;
+}) {
   return (
     <div className={clsx("flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm shadow-sm", toneClasses[type])}>
       {type === "success" ? (
@@ -18,7 +32,17 @@ export function Alert({ type = "error", children }: { type?: AlertType; children
       ) : (
         <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
       )}
-      <span>{children}</span>
+      <span className="flex-1">{children}</span>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Dismiss"
+          className={clsx("-m-1 shrink-0 rounded-full p-1 transition-colors", dismissClasses[type])}
+        >
+          <XMarkIcon className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

@@ -32,6 +32,7 @@ export interface ChatMessage {
   mimeType: string | null;
   durationSeconds: number | null;
   createdAt: string;
+  deleted: boolean;
 }
 
 export interface MessageListResponse {

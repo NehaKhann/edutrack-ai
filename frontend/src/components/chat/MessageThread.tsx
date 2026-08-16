@@ -7,6 +7,7 @@ import type { ChatMessage, Conversation } from "../../types/chat";
 import { MessageBubble } from "./MessageBubble";
 import { MessageComposer } from "./MessageComposer";
 import { SkeletonRows } from "../Skeleton";
+import { ConfirmModal } from "../ConfirmModal";
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -26,18 +27,25 @@ export function MessageThread({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [readThroughAt, setReadThroughAt] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ChatMessage | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastTimestampRef = useRef<string | undefined>(undefined);
   const seenIdsRef = useRef<Set<number>>(new Set());
 
-  const appendMessages = useCallback((incoming: ChatMessage[]) => {
+  // Handles both brand-new messages (appended) and updates to ones already shown in place (e.g. a
+  // delete push) -- a plain "add if unseen" filter would silently drop delete events for messages
+  // whose id is already in seenIdsRef.
+  const applyIncoming = useCallback((incoming: ChatMessage[]) => {
     if (incoming.length === 0) return;
     setMessages((prev) => {
-      const fresh = incoming.filter((m) => !seenIdsRef.current.has(m.id));
-      fresh.forEach((m) => seenIdsRef.current.add(m.id));
-      if (fresh.length === 0) return prev;
-      lastTimestampRef.current = fresh[fresh.length - 1].createdAt;
-      return [...prev, ...fresh];
+      const prevIds = new Set(prev.map((m) => m.id));
+      const updated = prev.map((m) => incoming.find((i) => i.id === m.id) ?? m);
+      const brandNew = incoming.filter((m) => !prevIds.has(m.id) && !seenIdsRef.current.has(m.id));
+      brandNew.forEach((m) => seenIdsRef.current.add(m.id));
+      if (brandNew.length === 0) return updated;
+      lastTimestampRef.current = brandNew[brandNew.length - 1].createdAt;
+      return [...updated, ...brandNew];
     });
   }, []);
 
@@ -73,7 +81,7 @@ export function MessageThread({
           // already-sent message's ticks turn blue shortly after the recipient opens the chat.
           setReadThroughAt(res.readThroughAt);
           if (res.messages.length === 0) return;
-          appendMessages(res.messages);
+          applyIncoming(res.messages);
           const hasIncoming = res.messages.some((m) => m.senderId !== currentUserId);
           if (hasIncoming) {
             chatApi.markRead(conversation.id).then(onActivity).catch(() => {});
@@ -86,10 +94,10 @@ export function MessageThread({
 
     // Pushed messages land here the instant they're sent — the poll above keeps running regardless
     // (cheap, per-open-thread only) so read-receipt ticks keep refreshing live and there's still a
-    // fallback if the socket is down; appendMessages' seenIdsRef de-dupes if both deliver the same one.
+    // fallback if the socket is down; applyIncoming's seenIdsRef de-dupes if both deliver the same one.
     const unsubscribe = realtime.subscribe<ChatMessage>("/user/queue/chat-messages", (m) => {
       if (cancelled || m.conversationId !== conversation.id) return;
-      appendMessages([m]);
+      applyIncoming([m]);
       if (m.senderId !== currentUserId) {
         chatApi.markRead(conversation.id).then(onActivity).catch(() => {});
       } else {
@@ -112,7 +120,7 @@ export function MessageThread({
   async function handleSendText(text: string) {
     try {
       const sent = await chatApi.sendMessage({ conversationId: conversation.id, type: "TEXT", content: text });
-      appendMessages([sent]);
+      applyIncoming([sent]);
       onActivity();
     } catch (err) {
       onError(errorMessage(err));
@@ -123,7 +131,7 @@ export function MessageThread({
     try {
       const type = file.type.startsWith("image/") ? "IMAGE" : "DOCUMENT";
       const sent = await chatApi.sendMessage({ conversationId: conversation.id, type, content: caption, file, fileName: file.name });
-      appendMessages([sent]);
+      applyIncoming([sent]);
       onActivity();
     } catch (err) {
       onError(errorMessage(err));
@@ -139,10 +147,36 @@ export function MessageThread({
         fileName: "voice-message.webm",
         durationSeconds,
       });
-      appendMessages([sent]);
+      applyIncoming([sent]);
       onActivity();
     } catch (err) {
       onError(errorMessage(err));
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await chatApi.deleteMessage(conversation.id, deleteTarget.id);
+      applyIncoming([
+        {
+          ...deleteTarget,
+          deleted: true,
+          content: null,
+          hasFile: false,
+          fileName: null,
+          fileSize: null,
+          mimeType: null,
+          durationSeconds: null,
+        },
+      ]);
+      setDeleteTarget(null);
+      onActivity();
+    } catch (err) {
+      onError(errorMessage(err));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -183,6 +217,7 @@ export function MessageThread({
               mine={m.senderId === currentUserId}
               showSender={conversation.type === "GROUP"}
               read={Boolean(readThroughAt && m.createdAt <= readThroughAt)}
+              onDelete={() => setDeleteTarget(m)}
             />
           ))
         )}
@@ -190,6 +225,16 @@ export function MessageThread({
       </div>
 
       <MessageComposer onSendText={handleSendText} onSendFile={handleSendFile} onSendVoice={handleSendVoice} />
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete message?"
+        message="This deletes the message for everyone in this conversation, not just you. This can't be undone."
+        confirmLabel="Delete for everyone"
+        loading={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
