@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  CameraIcon,
-  BriefcaseIcon,
-  XMarkIcon,
-  CheckIcon,
-  DocumentTextIcon,
-  ArrowDownTrayIcon,
-  KeyIcon,
-} from "@heroicons/react/24/outline";
+import { CameraIcon, BriefcaseIcon, XMarkIcon, CheckIcon, DocumentTextIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
@@ -17,6 +9,7 @@ import { FullPageSpinner } from "../../components/Spinner";
 import { Badge } from "../../components/Badge";
 import { Toast } from "../../components/Toast";
 import { ProfilePhoto } from "../../components/ProfilePhoto";
+import { ChangePasswordCard } from "../../components/ChangePasswordCard";
 import * as profileApi from "../../api/teacherProfile";
 import { apiClient, errorMessage } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
@@ -74,7 +67,7 @@ export function ProfilePage() {
 
         <div className="space-y-6 lg:col-span-2">
           <DetailsCard profile={profile} onSaved={setProfile} onError={(e) => setError(errorMessage(e))} onToast={notify} />
-          <ChangePasswordCard forced={!!user?.mustChangePassword} onChanged={handlePasswordChanged} onError={(e) => notify(errorMessage(e), "error")} />
+          <ChangePasswordCard forced={!!user?.mustChangePassword} onChanged={handlePasswordChanged} />
         </div>
       </div>
 
@@ -126,71 +119,6 @@ function CvCard({ profile }: { profile: TeacherProfile }) {
         ) : (
           <p className="text-sm text-slate-400 dark:text-slate-500">No CV uploaded by the Principal yet.</p>
         )}
-      </CardBody>
-    </Card>
-  );
-}
-
-function ChangePasswordCard({
-  forced,
-  onChanged,
-  onError,
-}: {
-  forced: boolean;
-  onChanged: () => void;
-  onError: (e: unknown) => void;
-}) {
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [localError, setLocalError] = useState<string | null>(null);
-
-  async function handleSubmit() {
-    setLocalError(null);
-    if (newPassword.length < 8) {
-      setLocalError("New password must be at least 8 characters.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setLocalError("New password and confirmation do not match.");
-      return;
-    }
-    setSaving(true);
-    try {
-      await profileApi.changeMyPassword(currentPassword, newPassword);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      onChanged();
-    } catch (e) {
-      onError(e);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Card className={forced ? "ring-2 ring-amber-400/60 dark:ring-amber-500/40" : undefined}>
-      <CardHeader>
-        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-          <KeyIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" /> Change Password
-        </h3>
-      </CardHeader>
-      <CardBody className="space-y-4">
-        {localError && <Alert type="error">{localError}</Alert>}
-        <Field label={forced ? "Temporary password" : "Current password"}>
-          <TextInput type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" />
-        </Field>
-        <Field label="New password" hint="At least 8 characters.">
-          <TextInput type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" />
-        </Field>
-        <Field label="Confirm new password">
-          <TextInput type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" />
-        </Field>
-        <Button onClick={handleSubmit} loading={saving} disabled={!currentPassword || !newPassword || !confirmPassword}>
-          Update password
-        </Button>
       </CardBody>
     </Card>
   );

@@ -5,6 +5,7 @@ import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { SyllabusPage } from "./pages/teacher/SyllabusPage";
 import { LessonPlanPage } from "./pages/teacher/LessonPlanPage";
 import { ProfilePage } from "./pages/teacher/ProfilePage";
+import { ProfilePage as PrincipalProfilePage } from "./pages/principal/ProfilePage";
 import { DiaryPage } from "./pages/teacher/DiaryPage";
 import { AttendancePage } from "./pages/teacher/AttendancePage";
 import { MyAttendancePage } from "./pages/teacher/MyAttendancePage";
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/principal/attendance" element={<AttendanceDashboardPage />} />
             <Route path="/principal/teacher-attendance" element={<TeacherAttendancePage />} />
             <Route path="/principal/audit-log" element={<AuditLogPage />} />
+            <Route path="/principal/profile" element={<PrincipalProfilePage />} />
           </Route>
         </Route>
       </Route>

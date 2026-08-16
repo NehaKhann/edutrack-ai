@@ -23,14 +23,11 @@ import {
   TableCellsIcon,
   ChatBubbleLeftRightIcon,
   ShieldCheckIcon,
-  KeyIcon,
   ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../auth/AuthContext";
 import { AmbientBackground } from "../components/AmbientBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { ChangePasswordModal } from "../components/ChangePasswordModal";
-import { Toast } from "../components/Toast";
 import * as notificationsApi from "../api/notifications";
 import * as chatApi from "../api/chat";
 import * as realtime from "../lib/realtime";
@@ -69,6 +66,7 @@ const principalNav: NavItem[] = [
   { to: "/principal/audit-log", label: "Audit Log", icon: ShieldCheckIcon, section: "main" },
   { to: "/chat", label: "Chat", icon: ChatBubbleLeftRightIcon, section: "tools" },
   { to: "/search", label: "Search", icon: MagnifyingGlassIcon, section: "tools" },
+  { to: "/principal/profile", label: "My Profile", icon: UserCircleIcon, section: "tools" },
   { to: "/calendar", label: "Calendar", icon: CalendarIcon, section: "tools" },
 ];
 
@@ -118,8 +116,6 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
-  const [passwordToast, setPasswordToast] = useState<string | null>(null);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -241,11 +237,11 @@ export function AppLayout() {
               {roleLabel}
             </span>
             {user.role === "TEACHER" ? (
-              <div className="hidden h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm sm:grid">
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm">
                 {initialsOf(user.name)}
               </div>
             ) : (
-              <UserMenu onChangePassword={() => setPasswordModalOpen(true)} />
+              <UserMenu />
             )}
           </div>
         </header>
@@ -264,18 +260,6 @@ export function AppLayout() {
           </AnimatePresence>
         </main>
       </div>
-
-      {user.role !== "TEACHER" && (
-        <ChangePasswordModal
-          open={passwordModalOpen}
-          onClose={() => setPasswordModalOpen(false)}
-          onChanged={() => {
-            setPasswordModalOpen(false);
-            setPasswordToast("Password changed successfully.");
-          }}
-        />
-      )}
-      <Toast message={passwordToast} onClose={() => setPasswordToast(null)} />
     </div>
   );
 }
@@ -313,8 +297,9 @@ function ChatUnreadBadge() {
   );
 }
 
-function UserMenu({ onChangePassword }: { onChangePassword: () => void }) {
+function UserMenu() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -355,7 +340,7 @@ function UserMenu({ onChangePassword }: { onChangePassword: () => void }) {
         onClick={() => setOpen((v) => !v)}
         aria-label="Account menu"
         aria-expanded={open}
-        className="hidden items-center gap-1.5 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-slate-100 dark:hover:bg-white/[0.08] sm:flex"
+        className="flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-slate-100 dark:hover:bg-white/[0.08]"
       >
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm">
           {initialsOf(user.name)}
@@ -389,12 +374,12 @@ function UserMenu({ onChangePassword }: { onChangePassword: () => void }) {
                   type="button"
                   onClick={() => {
                     setOpen(false);
-                    onChangePassword();
+                    navigate("/principal/profile");
                   }}
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/[0.05]"
                 >
-                  <KeyIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                  Change password
+                  <UserCircleIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  My Profile
                 </button>
                 <button
                   type="button"
