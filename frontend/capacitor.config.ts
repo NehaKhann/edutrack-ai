@@ -5,9 +5,10 @@ const config: CapacitorConfig = {
   appName: "Metropolitan School North Campus 1",
   webDir: "dist",
   server: {
-    // Points the Android app at the live deployed site, not a bundled copy —
+    // Points the Android app at this school's own private deployment, not a bundled copy —
     // every push to Cloudflare/Render shows up in the app immediately, no rebuild needed.
-    url: "https://edutrack-ai.n-nehakhan333.workers.dev",
+    // This is intentionally NOT the public demo URL — see README's "Deployment" section.
+    url: "https://edutrack-school.n-nehakhan333.workers.dev",
     androidScheme: "https",
   },
 };
