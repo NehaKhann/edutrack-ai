@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import clsx from "clsx";
 import { CheckCircleIcon, UsersIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Field, TextInput, Select } from "../../components/FormFields";
+import { DatePicker } from "../../components/DatePicker";
 import { Alert } from "../../components/Alert";
 import { SkeletonRows } from "../../components/Skeleton";
 import { Toast } from "../../components/Toast";
@@ -33,6 +35,33 @@ const STATUS_OPTIONS: SegmentedOption<StudentAttendanceStatus>[] = [
 
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
+const STATUS_META: Record<StudentAttendanceStatus, { label: string; dot: string; text: string; ring: string }> = {
+  PRESENT: {
+    label: "Present",
+    dot: "bg-teal-500",
+    text: "text-teal-600 dark:text-teal-400",
+    ring: "border-teal-300 bg-teal-50/70 dark:border-teal-500/40 dark:bg-teal-500/[0.08]",
+  },
+  ABSENT: {
+    label: "Absent",
+    dot: "bg-coral-500",
+    text: "text-coral-600 dark:text-coral-400",
+    ring: "border-coral-300 bg-coral-50/70 dark:border-coral-500/40 dark:bg-coral-500/[0.08]",
+  },
+  LATE: {
+    label: "Late",
+    dot: "bg-amber-500",
+    text: "text-amber-600 dark:text-amber-400",
+    ring: "border-amber-300 bg-amber-50/70 dark:border-amber-500/40 dark:bg-amber-500/[0.08]",
+  },
+  LEAVE: {
+    label: "Leave",
+    dot: "bg-blue-500",
+    text: "text-blue-600 dark:text-blue-400",
+    ring: "border-blue-300 bg-blue-50/70 dark:border-blue-500/40 dark:bg-blue-500/[0.08]",
+  },
+};
+
 export function AttendancePage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [classSectionId, setClassSectionId] = useState<number | null>(null);
@@ -49,6 +78,8 @@ export function AttendancePage() {
   const [toast, setToast] = useState<string | null>(null);
   const [rosterOpen, setRosterOpen] = useState(false);
   const [rosterVersion, setRosterVersion] = useState(0);
+  const [sortBy, setSortBy] = useState<"roll" | "name">("roll");
+  const [statusFilter, setStatusFilter] = useState<StudentAttendanceStatus | null>(null);
 
   const classSections = useMemo(() => {
     const map = new Map<number, ClassSectionSummary>();
@@ -59,6 +90,21 @@ export function AttendancePage() {
   }, [subjects]);
 
   const classSubjects = useMemo(() => subjects.filter((s) => s.classSectionId === classSectionId), [subjects, classSectionId]);
+
+  const sortedRoster = useMemo(() => {
+    const copy = [...roster];
+    copy.sort((a, b) =>
+      sortBy === "name"
+        ? a.name.localeCompare(b.name)
+        : a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true })
+    );
+    return copy;
+  }, [roster, sortBy]);
+
+  const visibleRoster = useMemo(() => {
+    if (!statusFilter) return sortedRoster;
+    return sortedRoster.filter((s) => marks[s.studentId] === statusFilter);
+  }, [sortedRoster, marks, statusFilter]);
 
   useEffect(() => {
     getMySubjects()
@@ -92,6 +138,7 @@ export function AttendancePage() {
       })
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
+    setStatusFilter(null);
   }, [classSectionId, date, mode, subjectId, period, rosterVersion]);
 
   function markAllPresent() {
@@ -104,6 +151,7 @@ export function AttendancePage() {
   Object.values(marks).forEach((s) => (counts[s] += 1));
   const markedCount = Object.keys(marks).length;
   const presentPercent = markedCount > 0 ? Math.round((counts.PRESENT / markedCount) * 100) : 0;
+  const attendancePercent = markedCount > 0 ? Math.round(((counts.PRESENT + counts.LATE) / markedCount) * 100) : 0;
 
   async function handleSubmit() {
     if (!classSectionId) return;
@@ -143,7 +191,7 @@ export function AttendancePage() {
         <CardBody className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">
             <Field label="Date">
-              <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+              <DatePicker value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
             </Field>
             <ClassSectionPicker
               classSections={classSections}
@@ -196,36 +244,86 @@ export function AttendancePage() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{roster.length} students</h3>
-            <div className="mt-1.5 flex flex-wrap items-baseline gap-4">
-              <span className="flex items-baseline gap-1 text-teal-600 dark:text-teal-400">
-                <span className="text-lg font-bold tabular-nums">{counts.PRESENT}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Present</span>
-              </span>
-              <span className="flex items-baseline gap-1 text-coral-600 dark:text-coral-400">
-                <span className="text-lg font-bold tabular-nums">{counts.ABSENT}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Absent</span>
-              </span>
-              <span className="flex items-baseline gap-1 text-amber-600 dark:text-amber-400">
-                <span className="text-lg font-bold tabular-nums">{counts.LATE}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Late</span>
-              </span>
-              <span className="flex items-baseline gap-1 text-blue-600 dark:text-blue-400">
-                <span className="text-lg font-bold tabular-nums">{counts.LEAVE}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide">Leave</span>
-              </span>
-              {markedCount > 0 && (
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:bg-white/[0.08] dark:text-slate-300">
-                  {presentPercent}% present
-                </span>
+        <CardHeader className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">{roster.length} students</h3>
+              {statusFilter && (
+                <button
+                  onClick={() => setStatusFilter(null)}
+                  className="mt-0.5 text-[11px] font-semibold text-brand-600 hover:underline dark:text-brand-300"
+                >
+                  Showing {STATUS_META[statusFilter].label.toLowerCase()} only — clear filter
+                </button>
               )}
             </div>
+            <div className="flex flex-wrap items-center gap-3">
+              {roster.length > 0 && (
+                <div className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white/80 p-0.5 dark:border-white/15 dark:bg-white/5">
+                  <span className="pl-1.5 text-[11px] font-semibold text-slate-400 dark:text-slate-500">Sort:</span>
+                  <button
+                    onClick={() => setSortBy("roll")}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${sortBy === "roll" ? "bg-brand-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
+                  >
+                    Roll No.
+                  </button>
+                  <button
+                    onClick={() => setSortBy("name")}
+                    className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${sortBy === "name" ? "bg-brand-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
+                  >
+                    Name
+                  </button>
+                </div>
+              )}
+              <Button size="sm" onClick={markAllPresent} disabled={roster.length === 0}>
+                <CheckCircleIcon className="h-4 w-4" /> Mark All Present
+              </Button>
+            </div>
           </div>
-          <Button size="sm" onClick={markAllPresent} disabled={roster.length === 0}>
-            <CheckCircleIcon className="h-4 w-4" /> Mark All Present
-          </Button>
+
+          {roster.length > 0 && (
+            <>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(Object.keys(STATUS_META) as StudentAttendanceStatus[]).map((status) => {
+                  const meta = STATUS_META[status];
+                  const active = statusFilter === status;
+                  const count = counts[status];
+                  return (
+                    <button
+                      key={status}
+                      onClick={() => count > 0 && setStatusFilter((f) => (f === status ? null : status))}
+                      disabled={count === 0}
+                      title={count === 0 ? `No students marked ${meta.label.toLowerCase()}` : `Show only ${meta.label.toLowerCase()} students`}
+                      className={clsx(
+                        "flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-all",
+                        active
+                          ? clsx(meta.ring, "shadow-sm")
+                          : "border-slate-200 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20",
+                        count === 0 && "cursor-not-allowed opacity-50"
+                      )}
+                    >
+                      <span className={clsx("h-2.5 w-2.5 shrink-0 rounded-full", meta.dot)} />
+                      <span className="flex items-baseline gap-1.5">
+                        <span className={clsx("text-lg font-bold tabular-nums", meta.text)}>{count}</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{meta.label}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {markedCount > 0 && (
+                <div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/[0.08]">
+                    <div className="h-full rounded-full bg-teal-500 transition-all duration-300" style={{ width: `${presentPercent}%` }} />
+                  </div>
+                  <p className="mt-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {presentPercent}% present · {attendancePercent}% attendance (present + late)
+                  </p>
+                </div>
+              )}
+            </>
+          )}
         </CardHeader>
         <CardBody>
           {loading ? (
@@ -237,9 +335,21 @@ export function AttendancePage() {
                 <PlusIcon className="h-4 w-4" /> Add students
               </Button>
             </div>
+          ) : visibleRoster.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <p className="text-sm text-slate-400 dark:text-slate-500">
+                No {statusFilter && STATUS_META[statusFilter].label.toLowerCase()} students to show.
+              </p>
+              <button
+                onClick={() => setStatusFilter(null)}
+                className="text-xs font-semibold text-brand-600 hover:underline dark:text-brand-300"
+              >
+                Clear filter
+              </button>
+            </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-white/[0.08]">
-              {roster.map((s) => (
+              {visibleRoster.map((s) => (
                 <div
                   key={s.studentId}
                   className="flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04]"

@@ -10,15 +10,18 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@aparajita/capacitor-biometric-auth": "^10.0.0",
     "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^8.5.0",
     "@capacitor/core": "^8.5.0",
     "@heroicons/react": "^2.2.0",
+    "@stomp/stompjs": "^7.3.0",
     "axios": "^1.7.9",
     "clsx": "^2.1.1",
     "face-api.js": "^0.22.2",
     "framer-motion": "^13.0.0",
     "react": "^18.3.1",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.1",
     "recharts": "^3.10.1"

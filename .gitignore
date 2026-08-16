@@ -15,6 +15,9 @@ frontend/vite.config.d.ts
 .env
 *.env.local
 
+# Claude Code local tool state (machine-specific, not shared)
+.claude/
+
 # Storage / uploads
 backend/storage/
 

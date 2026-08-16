@@ -151,6 +151,7 @@ No self-registration exists anywhere in the app — the Principal account is pro
 ```
 backend/    Spring Boot API — see src/main/java/com/edutrack/{syllabus,attendance,staffattendance,diary,calendar,face,notification,profile,llm,pdf,storage,security,org}
 frontend/   React app — see src/pages/{teacher,principal}; android/ is the Capacitor-generated native Android project
+chat/       Self-hosted Matrix/Element deployment (separate from the main app) — see chat/README.md
 docker-compose.yml
 .env.example
 TESTING.md

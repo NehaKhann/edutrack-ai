@@ -1,5 +1,7 @@
 package com.edutrack.org.service;
 
+import com.edutrack.audit.entity.AuditAction;
+import com.edutrack.audit.service.AuditLogService;
 import com.edutrack.common.ApiException;
 import com.edutrack.org.dto.StudentResponse;
 import com.edutrack.org.dto.StudentUpsertRequest;
@@ -24,6 +26,7 @@ public class StudentService {
     private final StudentRepository studentRepository;
     private final ClassSectionRepository classSectionRepository;
     private final SubjectRepository subjectRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<StudentResponse> listForClassSection(Long classSectionId) {
@@ -36,7 +39,10 @@ public class StudentService {
     public StudentResponse create(Long classSectionId, StudentUpsertRequest request) {
         ClassSection classSection = getAccessible(classSectionId);
         Student student = new Student(classSection, request.name(), request.rollNumber());
-        return StudentResponse.from(studentRepository.save(student));
+        Student saved = studentRepository.save(student);
+        auditLogService.record(AuditAction.STUDENT_CREATED, "STUDENT", saved.getId(), saved.getName(),
+                "Added to " + classSection.getName() + " (roll no. " + saved.getRollNumber() + ")");
+        return StudentResponse.from(saved);
     }
 
     @Transactional
@@ -44,7 +50,9 @@ public class StudentService {
         Student student = getAccessibleStudent(studentId);
         student.setName(request.name());
         student.setRollNumber(request.rollNumber());
-        return StudentResponse.from(studentRepository.save(student));
+        Student saved = studentRepository.save(student);
+        auditLogService.record(AuditAction.STUDENT_UPDATED, "STUDENT", saved.getId(), saved.getName(), null);
+        return StudentResponse.from(saved);
     }
 
     @Transactional
@@ -52,6 +60,7 @@ public class StudentService {
         Student student = getAccessibleStudent(studentId);
         student.setActive(false);
         studentRepository.save(student);
+        auditLogService.record(AuditAction.STUDENT_DEACTIVATED, "STUDENT", studentId, student.getName(), null);
     }
 
     private ClassSection getAccessible(Long classSectionId) {

@@ -12,4 +12,5 @@ public interface DiaryEntryRepository extends JpaRepository<DiaryEntry, Long> {
     List<DiaryEntry> findByTeacherIdAndEntryDateOrderByIdDesc(Long teacherId, LocalDate entryDate);
     List<DiaryEntry> findBySubjectClassSectionIdAndEntryDate(Long classSectionId, LocalDate entryDate);
     List<DiaryEntry> findByTeacherIdAndEntryDateBetween(Long teacherId, LocalDate start, LocalDate end);
+    List<DiaryEntry> findBySubjectClassSectionIdAndEntryDateBetween(Long classSectionId, LocalDate start, LocalDate end);
 }

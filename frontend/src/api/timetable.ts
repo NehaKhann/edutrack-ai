@@ -28,3 +28,11 @@ export function saveCell(
 ): Promise<CellSaveResult> {
   return unwrap(apiClient.put(`/api/principal/timetable/class-sections/${classSectionId}/cells`, payload));
 }
+
+export function exportClassTimetableXlsx(classSectionId: number): Promise<Blob> {
+  return apiClient.get(`/api/principal/timetable/class-sections/${classSectionId}/export`, { responseType: "blob" }).then((res) => res.data);
+}
+
+export function exportTeacherTimetableXlsx(teacherId: number): Promise<Blob> {
+  return apiClient.get(`/api/principal/timetable/teachers/${teacherId}/export`, { responseType: "blob" }).then((res) => res.data);
+}

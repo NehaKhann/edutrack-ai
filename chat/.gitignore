@@ -1,0 +1,9 @@
+# Real secrets and generated runtime state — never commit these.
+.env
+synapse/homeserver.yaml
+synapse/homeserver.pid
+synapse/signing.key
+synapse/*.log*
+synapse/media_store/
+caddy/Caddyfile
+coturn/turnserver.conf

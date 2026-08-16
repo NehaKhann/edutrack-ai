@@ -19,9 +19,17 @@ import com.edutrack.timetable.dto.TimetableEntryResponse;
 import com.edutrack.timetable.entity.TimetableEntry;
 import com.edutrack.timetable.repository.TimetableEntryRepository;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -111,6 +119,63 @@ public class TimetableService {
                 .toList();
 
         return new CellSaveResult(TimetableEntryResponse.from(saved), clashes);
+    }
+
+    /** Principal-only. Flat day/period listing — not a visual day×period grid, just every occupied slot in order. */
+    @Transactional(readOnly = true)
+    public byte[] exportClassTimetableXlsx(Long classSectionId) {
+        ClassTimetableResponse timetable = getClassTimetable(classSectionId);
+        String[] cols = {"Day", "Period", "Subject", "Teacher"};
+        return buildWorkbook("Timetable", cols, timetable.entries(), e -> new String[]{
+                e.dayOfWeek().name(), String.valueOf(e.period()),
+                e.subjectName() != null ? e.subjectName() : "", e.teacherName() != null ? e.teacherName() : ""
+        });
+    }
+
+    /** Principal-only. Same flat shape as the class export, one row per occupied slot on this teacher's schedule. */
+    @Transactional(readOnly = true)
+    public byte[] exportTeacherTimetableXlsx(Long teacherId) {
+        TeacherTimetableResponse timetable = getTeacherTimetable(teacherId);
+        String[] cols = {"Day", "Period", "Class", "Subject"};
+        return buildWorkbook("Timetable", cols, timetable.entries(), e -> new String[]{
+                e.dayOfWeek().name(), String.valueOf(e.period()),
+                e.classSectionName() != null ? e.classSectionName() : "", e.subjectName() != null ? e.subjectName() : ""
+        });
+    }
+
+    private byte[] buildWorkbook(String sheetName, String[] cols, List<TimetableEntryResponse> entries,
+                                  java.util.function.Function<TimetableEntryResponse, String[]> rowMapper) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet(sheetName);
+            CellStyle headerStyle = exportHeaderStyle(workbook);
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < cols.length; i++) {
+                Cell cell = header.createCell(i);
+                cell.setCellValue(cols[i]);
+                cell.setCellStyle(headerStyle);
+            }
+            int rowIdx = 1;
+            for (TimetableEntryResponse entry : entries) {
+                Row row = sheet.createRow(rowIdx++);
+                String[] values = rowMapper.apply(entry);
+                for (int i = 0; i < values.length; i++) {
+                    row.createCell(i).setCellValue(values[i]);
+                }
+            }
+            for (int i = 0; i < cols.length; i++) sheet.autoSizeColumn(i);
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw ApiException.internal("Could not generate timetable export", e);
+        }
+    }
+
+    private CellStyle exportHeaderStyle(XSSFWorkbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        return style;
     }
 
     private ClassSection findClassSection(Long classSectionId) {

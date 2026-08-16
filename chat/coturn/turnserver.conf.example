@@ -1,0 +1,24 @@
+# Copy to turnserver.conf (gitignored) and fill in the two CHANGE_ME values.
+# This is what makes voice/video calls actually connect when either caller is behind
+# restrictive NAT/firewall (e.g. school WiFi, mobile data) — without it, calls between two
+# people not on the same open network will frequently fail to establish.
+
+listening-port=3478
+tls-listening-port=5349
+
+# Must be reachable from the internet — open these on your VM's firewall/security list too.
+min-port=49152
+max-port=49172
+
+fingerprint
+lt-cred-mech
+use-auth-secret
+# Generate with: openssl rand -hex 32 — must match turn_shared_secret in ../synapse/homeserver.yaml
+static-auth-secret=CHANGE_ME_TURN_SECRET
+
+realm=chat.CHANGE_ME.example
+
+total-quota=100
+stale-nonce=600
+no-multicast-peers
+no-cli

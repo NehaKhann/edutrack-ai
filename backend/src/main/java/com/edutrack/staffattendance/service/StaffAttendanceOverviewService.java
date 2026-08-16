@@ -33,12 +33,14 @@ public class StaffAttendanceOverviewService {
     private final TeacherAttendanceRecordRepository teacherAttendanceRepository;
     private final LeaveRequestRepository leaveRequestRepository;
     private final SkippedClassReportRepository skippedClassReportRepository;
+    private final TeacherAttendanceService teacherAttendanceService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<TeacherAttendanceTodayRow> today() {
         Long schoolId = CurrentUser.get().getSchoolId();
         LocalDate today = LocalDate.now();
         List<User> teachers = userRepository.findBySchoolIdAndRoleAndActive(schoolId, Role.TEACHER, true);
+        teachers.forEach(t -> teacherAttendanceService.ensureAutoAbsentIfPastCutoff(t.getId(), schoolId));
 
         return teachers.stream()
                 .sorted(Comparator.comparing(User::getName))

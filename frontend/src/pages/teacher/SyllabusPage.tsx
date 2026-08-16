@@ -28,6 +28,7 @@ import { SubjectSelect } from "../../components/SubjectSelect";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Field, Select, TextInput } from "../../components/FormFields";
+import { DatePicker } from "../../components/DatePicker";
 import { Modal } from "../../components/Modal";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { Alert } from "../../components/Alert";
@@ -310,7 +311,7 @@ function NewSyllabusForm({
           <TextInput value={term} onChange={(e) => setTerm(e.target.value)} placeholder="e.g. Term 1, 2026" />
         </Field>
         <Field label="Term start date" hint="Used to map Week 1, Week 2... to real calendar dates">
-          <TextInput type="date" value={termStartDate} onChange={(e) => setTermStartDate(e.target.value)} />
+          <DatePicker value={termStartDate} onChange={(e) => setTermStartDate(e.target.value)} />
         </Field>
 
         {existingSyllabi.length > 0 && (
@@ -586,7 +587,7 @@ function EditTermModal({
           <TextInput value={term} onChange={(e) => setTerm(e.target.value)} />
         </Field>
         <Field label="Term start date" hint="If you change this, you'll be offered a one-click shift for all topic dates too.">
-          <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <DatePicker value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </Field>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" size="sm" onClick={onCancel} disabled={saving}>
@@ -1602,10 +1603,10 @@ function TopicForm({
         </Field>
       </div>
       <Field label="Start date">
-        <TextInput type="date" value={plannedStartDate} onChange={(e) => setPlannedStartDate(e.target.value)} />
+        <DatePicker value={plannedStartDate} onChange={(e) => setPlannedStartDate(e.target.value)} />
       </Field>
       <Field label="End date">
-        <TextInput type="date" value={plannedEndDate} onChange={(e) => setPlannedEndDate(e.target.value)} />
+        <DatePicker value={plannedEndDate} onChange={(e) => setPlannedEndDate(e.target.value)} />
       </Field>
       <div className="col-span-full flex justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onCancel}>

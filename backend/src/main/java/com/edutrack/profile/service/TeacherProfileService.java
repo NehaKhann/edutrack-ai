@@ -1,5 +1,7 @@
 package com.edutrack.profile.service;
 
+import com.edutrack.audit.entity.AuditAction;
+import com.edutrack.audit.service.AuditLogService;
 import com.edutrack.common.ApiException;
 import com.edutrack.notification.service.NotificationService;
 import com.edutrack.org.dto.SubjectResponse;
@@ -45,6 +47,7 @@ public class TeacherProfileService {
     private final FileStorageService fileStorageService;
     private final PasswordEncoder passwordEncoder;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public TeacherProfileResponse getMyProfile() {
@@ -183,26 +186,51 @@ public class TeacherProfileService {
         }
         teacherProfileRepository.save(profile);
 
+        auditLogService.record(AuditAction.TEACHER_ACCOUNT_CREATED, "TEACHER", teacher.getId(), teacher.getName(), "Account created (" + email.trim().toLowerCase() + ")");
+
         return TeacherAccountResponse.from(teacher, profile);
     }
 
+    /** Any authenticated role can change their own password — this was previously teacher-only for no real reason. */
     @Transactional
     public void changeMyPassword(String currentPassword, String newPassword) {
-        Long teacherId = currentTeacherId();
-        User teacher = userRepository.findById(teacherId).orElseThrow(() -> ApiException.notFound("Teacher not found"));
-        if (!passwordEncoder.matches(currentPassword, teacher.getPasswordHash())) {
+        Long userId = CurrentUser.get().getUserId();
+        User user = userRepository.findById(userId).orElseThrow(() -> ApiException.notFound("Account not found"));
+        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw ApiException.badRequest("Current password is incorrect");
         }
-        boolean wasFirstChange = teacher.getTempPassword() != null;
-        teacher.setPasswordHash(passwordEncoder.encode(newPassword));
-        teacher.setTempPassword(null);
+        boolean wasFirstChange = user.getTempPassword() != null;
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setTempPassword(null);
+        userRepository.save(user);
+
+        if (wasFirstChange && user.getRole() == Role.TEACHER) {
+            userRepository.findBySchoolIdAndRole(user.getSchool().getId(), Role.PRINCIPAL)
+                    .forEach(principal -> notificationService.notify(principal,
+                            "Teacher " + user.getName() + " has successfully logged in and changed the password."));
+        }
+    }
+
+    /**
+     * Principal-only recovery path for a teacher who forgot their password — there's no self-service
+     * "forgot password" flow (that would need email sending, which this app doesn't have yet). Reuses
+     * the exact same temp-password mechanism as {@link #createTeacherAccount}: generates a new temp
+     * password, shown once to the Principal to share with the teacher out-of-band.
+     */
+    @Transactional
+    public TeacherAccountResponse resetPassword(Long teacherId) {
+        User teacher = findTeacherInSchool(teacherId);
+        String tempPassword = generateTempPassword();
+        teacher.setPasswordHash(passwordEncoder.encode(tempPassword));
+        teacher.setTempPassword(tempPassword);
         userRepository.save(teacher);
 
-        if (wasFirstChange) {
-            userRepository.findBySchoolIdAndRole(teacher.getSchool().getId(), Role.PRINCIPAL)
-                    .forEach(principal -> notificationService.notify(principal,
-                            "Teacher " + teacher.getName() + " has successfully logged in and changed the password."));
-        }
+        notificationService.notify(teacher, "Your password was reset by your Principal. Contact them for your new temporary password.");
+
+        auditLogService.record(AuditAction.TEACHER_PASSWORD_RESET, "TEACHER", teacherId, teacher.getName(), "Password reset by Principal");
+
+        TeacherProfile profile = teacherProfileRepository.findByUserId(teacherId).orElse(null);
+        return TeacherAccountResponse.from(teacher, profile);
     }
 
     @Transactional
@@ -210,6 +238,7 @@ public class TeacherProfileService {
         User teacher = findTeacherInSchool(teacherId);
         teacher.setActive(false);
         userRepository.save(teacher);
+        auditLogService.record(AuditAction.TEACHER_DEACTIVATED, "TEACHER", teacherId, teacher.getName(), null);
     }
 
     @Transactional
@@ -217,6 +246,7 @@ public class TeacherProfileService {
         User teacher = findTeacherInSchool(teacherId);
         teacher.setActive(true);
         userRepository.save(teacher);
+        auditLogService.record(AuditAction.TEACHER_REACTIVATED, "TEACHER", teacherId, teacher.getName(), null);
     }
 
     private String generateTempPassword() {

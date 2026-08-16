@@ -12,6 +12,7 @@ import { SubjectSelect } from "../../components/SubjectSelect";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Field, TextInput } from "../../components/FormFields";
+import { DatePicker } from "../../components/DatePicker";
 import { Alert } from "../../components/Alert";
 import { Spinner } from "../../components/Spinner";
 import { getMySubjects } from "../../api/subjects";
@@ -221,8 +222,7 @@ export function DiaryPage() {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Date">
-                <TextInput
-                  type="date"
+                <DatePicker
                   value={date}
                   onChange={(e) => {
                     setDate(e.target.value);
@@ -257,7 +257,7 @@ export function DiaryPage() {
                 <TextInput value={pageNumber} onChange={(e) => setPageNumber(e.target.value)} placeholder="e.g. 42–44" />
               </Field>
               <Field label="Due date" hint="Optional">
-                <TextInput type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                <DatePicker value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </Field>
             </div>
 

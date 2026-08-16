@@ -3,7 +3,8 @@ import clsx from "clsx";
 import { ArrowDownTrayIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../../components/Card";
-import { Field, TextInput, Select } from "../../components/FormFields";
+import { Field, Select } from "../../components/FormFields";
+import { DatePicker } from "../../components/DatePicker";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
@@ -14,6 +15,7 @@ import * as diaryApi from "../../api/diary";
 import { listClassSections } from "../../api/classSections";
 import { errorMessage } from "../../api/client";
 import { formatDate } from "../../utils/date";
+import { downloadBlob, isoDate } from "../../lib/download";
 import type { ClassSectionSummary } from "../../types/roster";
 import type { DiarySubjectRow } from "../../types/diary";
 
@@ -35,6 +37,7 @@ export function DiaryOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewing, setViewing] = useState<DiarySubjectRow | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     listClassSections()
@@ -69,16 +72,21 @@ export function DiaryOverviewPage() {
         title="Class Diary Overview"
         description="See what's been assigned across every subject, for any class."
         actions={
-          !loading && rows.length > 0 ? (
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300">
-                {submittedCount} submitted
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-coral-50 px-2.5 py-1 text-coral-700 dark:bg-coral-500/10 dark:text-coral-300">
-                {notSubmitted.length} pending
-              </span>
-            </div>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            {!loading && rows.length > 0 && (
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-teal-700 dark:bg-teal-500/10 dark:text-teal-300">
+                  {submittedCount} submitted
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-coral-50 px-2.5 py-1 text-coral-700 dark:bg-coral-500/10 dark:text-coral-300">
+                  {notSubmitted.length} pending
+                </span>
+              </div>
+            )}
+            <Button variant="secondary" size="sm" onClick={() => setExportOpen(true)} disabled={!classSectionId}>
+              <ArrowDownTrayIcon className="h-4 w-4" /> Export
+            </Button>
+          </div>
         }
       />
 
@@ -91,7 +99,7 @@ export function DiaryOverviewPage() {
       <Card>
         <CardBody className="flex flex-wrap items-end gap-3">
           <Field label="Date">
-            <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+            <DatePicker value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
           </Field>
           <ClassSectionPicker
             classSections={classSections}
@@ -236,6 +244,55 @@ export function DiaryOverviewPage() {
           </div>
         </Modal>
       )}
+
+      {exportOpen && classSectionId && (
+        <DiaryExportModal classSectionId={classSectionId} className={className} onClose={() => setExportOpen(false)} />
+      )}
     </div>
+  );
+}
+
+function DiaryExportModal({ classSectionId, className, onClose }: { classSectionId: number; className: string; onClose: () => void }) {
+  const now = new Date();
+  const [from, setFrom] = useState(isoDate(new Date(now.getFullYear(), now.getMonth(), 1)));
+  const [to, setTo] = useState(isoDate(now));
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleExport() {
+    setDownloading(true);
+    setError(null);
+    try {
+      const blob = await diaryApi.exportDiaryXlsx(classSectionId, from, to);
+      downloadBlob(blob, `diary-${className.replace(/\s+/g, "-")}-${from}-to-${to}.xlsx`);
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Export Diary — ${className}`} widthClass="max-w-sm">
+      {error && (
+        <div className="mb-3">
+          <Alert type="error">{error}</Alert>
+        </div>
+      )}
+      <div className="space-y-3">
+        <div className="flex gap-2">
+          <Field label="From">
+            <DatePicker value={from} onChange={(e) => setFrom(e.target.value)} maxDate={to} />
+          </Field>
+          <Field label="To">
+            <DatePicker value={to} onChange={(e) => setTo(e.target.value)} minDate={from} maxDate={isoDate(now)} />
+          </Field>
+        </div>
+        <Button className="w-full justify-center" variant="secondary" onClick={handleExport} loading={downloading}>
+          <ArrowDownTrayIcon className="h-4 w-4" /> Export Diary (.xlsx)
+        </Button>
+      </div>
+    </Modal>
   );
 }

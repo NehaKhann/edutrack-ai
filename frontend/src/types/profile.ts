@@ -36,3 +36,19 @@ export interface TeacherAccount {
   hasCv: boolean;
   cvFilename: string | null;
 }
+
+export interface TeacherImportSkippedRow {
+  row: number;
+  reason: string;
+}
+
+export interface TeacherImportCreated {
+  name: string;
+  email: string;
+  tempPassword: string;
+}
+
+export interface TeacherImportResult {
+  created: TeacherImportCreated[];
+  skipped: TeacherImportSkippedRow[];
+}

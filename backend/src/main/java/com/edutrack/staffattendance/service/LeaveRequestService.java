@@ -1,5 +1,7 @@
 package com.edutrack.staffattendance.service;
 
+import com.edutrack.audit.entity.AuditAction;
+import com.edutrack.audit.service.AuditLogService;
 import com.edutrack.common.ApiException;
 import com.edutrack.org.entity.Role;
 import com.edutrack.org.entity.User;
@@ -12,14 +14,26 @@ import com.edutrack.staffattendance.entity.LeaveStatus;
 import com.edutrack.staffattendance.entity.LeaveType;
 import com.edutrack.staffattendance.repository.LeaveRequestRepository;
 import com.edutrack.storage.FileStorageService;
+import com.edutrack.storage.UploadGuard;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +57,7 @@ public class LeaveRequestService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public LeaveRequestResponse apply(LeaveType leaveType, LocalDate fromDate, LocalDate toDate, String reason, MultipartFile document) {
@@ -52,6 +67,7 @@ public class LeaveRequestService {
         User teacher = userRepository.findById(CurrentUser.get().getUserId()).orElseThrow();
         LeaveRequest request = new LeaveRequest(teacher, leaveType, fromDate, toDate, reason);
         if (document != null && !document.isEmpty()) {
+            UploadGuard.assertSafe(document);
             request.setDocumentFileRef(fileStorageService.store(document, "leave-documents"));
             request.setDocumentFilename(document.getOriginalFilename());
         }
@@ -77,7 +93,10 @@ public class LeaveRequestService {
             throw ApiException.conflict("Only a pending leave request can be cancelled");
         }
         request.setStatus(LeaveStatus.CANCELLED);
-        return LeaveRequestResponse.from(leaveRequestRepository.save(request));
+        LeaveRequestResponse saved = LeaveRequestResponse.from(leaveRequestRepository.save(request));
+        auditLogService.record(AuditAction.LEAVE_CANCELLED, "LEAVE_REQUEST", leaveRequestId, request.getTeacher().getName(),
+                request.getLeaveType() + " leave (" + request.getFromDate() + " to " + request.getToDate() + ") cancelled by the requester");
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -122,7 +141,13 @@ public class LeaveRequestService {
         request.setStatus(approve ? LeaveStatus.APPROVED : LeaveStatus.REJECTED);
         request.setReviewedBy(reviewer);
         request.setReviewedAt(Instant.now());
-        return LeaveRequestResponse.from(leaveRequestRepository.save(request));
+        LeaveRequestResponse saved = LeaveRequestResponse.from(leaveRequestRepository.save(request));
+        auditLogService.record(
+                approve ? AuditAction.LEAVE_APPROVED : AuditAction.LEAVE_REJECTED,
+                "LEAVE_REQUEST", leaveRequestId, request.getTeacher().getName(),
+                request.getLeaveType() + " leave (" + request.getFromDate() + " to " + request.getToDate() + ") " + (approve ? "approved" : "rejected")
+        );
+        return saved;
     }
 
     private void assertPrincipal() {
@@ -130,5 +155,55 @@ public class LeaveRequestService {
         if (role != Role.PRINCIPAL && role != Role.ADMIN) {
             throw ApiException.forbidden("Only a Principal can review leave requests");
         }
+    }
+
+    /** Principal-only. Every leave request whose period overlaps the given range, for record-keeping/compliance purposes. */
+    @Transactional(readOnly = true)
+    public byte[] exportLeaveXlsx(LocalDate from, LocalDate to) {
+        assertPrincipal();
+        if (to.isBefore(from)) {
+            throw ApiException.badRequest("End date can't be before the start date");
+        }
+        Long schoolId = CurrentUser.get().getSchoolId();
+        List<LeaveRequest> requests = leaveRequestRepository.findByTeacherSchoolIdAndFromDateLessThanEqualAndToDateGreaterThanEqual(schoolId, to, from);
+        requests.sort(Comparator.comparing(LeaveRequest::getFromDate));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Leave Requests");
+            CellStyle headerStyle = exportHeaderStyle(workbook);
+            String[] cols = {"Teacher", "Leave Type", "From", "To", "Reason", "Status", "Reviewed By", "Reviewed At"};
+            Row header = sheet.createRow(0);
+            for (int i = 0; i < cols.length; i++) {
+                Cell cell = header.createCell(i);
+                cell.setCellValue(cols[i]);
+                cell.setCellStyle(headerStyle);
+            }
+            DateTimeFormatter tf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
+            int rowIdx = 1;
+            for (LeaveRequest r : requests) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(r.getTeacher().getName());
+                row.createCell(1).setCellValue(r.getLeaveType().name());
+                row.createCell(2).setCellValue(r.getFromDate().toString());
+                row.createCell(3).setCellValue(r.getToDate().toString());
+                row.createCell(4).setCellValue(r.getReason());
+                row.createCell(5).setCellValue(r.getStatus().name());
+                row.createCell(6).setCellValue(r.getReviewedBy() != null ? r.getReviewedBy().getName() : "");
+                row.createCell(7).setCellValue(r.getReviewedAt() != null ? tf.format(r.getReviewedAt()) : "");
+            }
+            for (int i = 0; i < cols.length; i++) sheet.autoSizeColumn(i);
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (IOException e) {
+            throw ApiException.internal("Could not generate leave export", e);
+        }
+    }
+
+    private CellStyle exportHeaderStyle(XSSFWorkbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        style.setFont(font);
+        return style;
     }
 }

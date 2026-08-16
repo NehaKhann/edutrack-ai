@@ -12,7 +12,19 @@ const toneClasses: Record<Tone, string> = {
   brand: "text-brand-600 dark:text-brand-400",
 };
 
-export function StatCard({ icon, label, value, tone = "default" }: { icon?: ReactNode; label: string; value: ReactNode; tone?: Tone }) {
+export function StatCard({
+  icon,
+  label,
+  value,
+  tone = "default",
+  hint,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: ReactNode;
+  tone?: Tone;
+  hint?: ReactNode;
+}) {
   return (
     <Card>
       <CardBody>
@@ -21,6 +33,7 @@ export function StatCard({ icon, label, value, tone = "default" }: { icon?: Reac
           {label}
         </p>
         <p className={clsx("mt-1.5 text-2xl font-bold tabular-nums", toneClasses[tone])}>{value}</p>
+        {hint && <p className="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">{hint}</p>}
       </CardBody>
     </Card>
   );

@@ -1,16 +1,22 @@
 package com.edutrack.staffattendance.controller;
 
 import com.edutrack.common.ApiResponse;
+import com.edutrack.staffattendance.dto.AttendanceCorrectionRequestResponse;
+import com.edutrack.staffattendance.dto.AttendancePolicyResponse;
 import com.edutrack.staffattendance.dto.CreateSkipReportRequest;
 import com.edutrack.staffattendance.dto.LeaveBalanceResponse;
+import com.edutrack.staffattendance.dto.MyAttendanceSummaryResponse;
 import com.edutrack.staffattendance.dto.LeaveRequestResponse;
 import com.edutrack.staffattendance.dto.MyTodayStatusResponse;
 import com.edutrack.staffattendance.dto.SetMyStatusRequest;
 import com.edutrack.staffattendance.dto.SkippedClassReportResponse;
+import com.edutrack.staffattendance.dto.SubmitCorrectionRequest;
 import com.edutrack.staffattendance.entity.LeaveType;
+import com.edutrack.staffattendance.service.AttendanceCorrectionService;
 import com.edutrack.staffattendance.service.LeaveRequestService;
 import com.edutrack.staffattendance.service.SkippedClassService;
 import com.edutrack.staffattendance.service.TeacherAttendanceService;
+import com.edutrack.security.CurrentUser;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,15 +33,34 @@ public class StaffAttendanceController {
     private final TeacherAttendanceService teacherAttendanceService;
     private final LeaveRequestService leaveRequestService;
     private final SkippedClassService skippedClassService;
+    private final AttendanceCorrectionService attendanceCorrectionService;
 
     @GetMapping("/api/teacher-attendance/me")
     public ApiResponse<MyTodayStatusResponse> myToday() {
         return ApiResponse.ok(teacherAttendanceService.getMyToday());
     }
 
+    @GetMapping("/api/teacher-attendance/me/summary")
+    public ApiResponse<MyAttendanceSummaryResponse> mySummary() {
+        return ApiResponse.ok(teacherAttendanceService.getMySummary());
+    }
+
+    /** Readable by any authenticated staff member so the marking page can display the policy. */
+    @GetMapping("/api/teacher-attendance/policy")
+    public ApiResponse<AttendancePolicyResponse> policy() {
+        return ApiResponse.ok(teacherAttendanceService.getPolicy(CurrentUser.get().getSchoolId()));
+    }
+
     @PostMapping("/api/teacher-attendance/me")
     public ApiResponse<Void> setMyStatus(@Valid @RequestBody SetMyStatusRequest request) {
         teacherAttendanceService.setMyStatus(request.status());
+        return ApiResponse.ok(null);
+    }
+
+    /** Marks the current authenticated teacher present after a successful native fingerprint prompt (Android app only). */
+    @PostMapping("/api/teacher-attendance/me/fingerprint")
+    public ApiResponse<Void> markFingerprint() {
+        teacherAttendanceService.markPresentViaFingerprint(CurrentUser.get().getUserId());
         return ApiResponse.ok(null);
     }
 
@@ -78,5 +103,20 @@ public class StaffAttendanceController {
     @PostMapping("/api/skipped-classes")
     public ApiResponse<SkippedClassReportResponse> reportSkippedClass(@Valid @RequestBody CreateSkipReportRequest request) {
         return ApiResponse.ok(skippedClassService.submit(request));
+    }
+
+    @PostMapping("/api/attendance-corrections")
+    public ApiResponse<AttendanceCorrectionRequestResponse> submitCorrection(@Valid @RequestBody SubmitCorrectionRequest request) {
+        return ApiResponse.ok(attendanceCorrectionService.submit(request.attendanceDate(), request.requestedStatus(), request.reason()));
+    }
+
+    @GetMapping("/api/attendance-corrections/mine")
+    public ApiResponse<List<AttendanceCorrectionRequestResponse>> myCorrections() {
+        return ApiResponse.ok(attendanceCorrectionService.listMine());
+    }
+
+    @PostMapping("/api/attendance-corrections/{id}/cancel")
+    public ApiResponse<AttendanceCorrectionRequestResponse> cancelCorrection(@PathVariable Long id) {
+        return ApiResponse.ok(attendanceCorrectionService.cancel(id));
     }
 }

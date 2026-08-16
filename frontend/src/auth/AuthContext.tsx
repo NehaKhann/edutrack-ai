@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { UserSummary } from "../types";
 import * as authApi from "../api/auth";
+import * as realtime from "../lib/realtime";
 
 interface AuthContextValue {
   user: UserSummary | null;
@@ -25,6 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("edutrack_user");
       }
     }
+    const token = localStorage.getItem("edutrack_token");
+    if (token) realtime.connect(token);
     setLoading(false);
   }, []);
 
@@ -37,11 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem("edutrack_token", res.token);
         localStorage.setItem("edutrack_user", JSON.stringify(res.user));
         setUser(res.user);
+        realtime.connect(res.token);
       },
       logout: () => {
         localStorage.removeItem("edutrack_token");
         localStorage.removeItem("edutrack_user");
         setUser(null);
+        realtime.disconnect();
       },
       updateUser: (patch: Partial<UserSummary>) => {
         setUser((prev) => {

@@ -7,6 +7,11 @@ RUN mvn -B package -DskipTests
 
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
+# The school (and every date/time-of-day comparison in this app — attendance cutoffs, "today", etc.)
+# operates in Pakistan time, not the container's default UTC clock. tzdata is needed for Alpine to
+# resolve the IANA zone name at all.
+RUN apk add --no-cache tzdata
+ENV TZ=Asia/Karachi
 RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng
 # Alpine's package repo has no Urdu language pack; fetch it directly from the official release. Urdu OCR is
 # hard enough on real scans that the "best" (slower, most accurate) model is worth it over "fast" here.

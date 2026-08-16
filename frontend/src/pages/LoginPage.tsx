@@ -16,6 +16,7 @@ import { TextInput, Field } from "../components/FormFields";
 import { Alert } from "../components/Alert";
 import { AmbientBackground } from "../components/AmbientBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { Modal } from "../components/Modal";
 import { errorMessage } from "../api/client";
 
 const DEMO_ACCOUNTS = [
@@ -32,6 +33,7 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -157,6 +159,13 @@ export function LoginPage() {
                 </button>
               </div>
             </Field>
+            <button
+              type="button"
+              onClick={() => setForgotOpen(true)}
+              className="-mt-1 block text-xs font-semibold text-brand-600 hover:underline dark:text-brand-300"
+            >
+              Forgot password?
+            </button>
             <Button type="submit" size="lg" className="w-full tracking-wide" loading={loading}>
               Sign in
             </Button>
@@ -180,6 +189,18 @@ export function LoginPage() {
           </p>
         </motion.div>
       </div>
+
+      {forgotOpen && (
+        <Modal open onClose={() => setForgotOpen(false)} title="Forgot your password?" widthClass="max-w-sm">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            There's no self-service reset yet — contact your school's Principal. They can reset your password from{" "}
+            <strong>Teacher Directory → Manage Teacher Accounts</strong> and share a new temporary password with you directly.
+          </p>
+          <Button className="mt-4 w-full justify-center" onClick={() => setForgotOpen(false)}>
+            Got it
+          </Button>
+        </Modal>
+      )}
     </div>
   );
 }

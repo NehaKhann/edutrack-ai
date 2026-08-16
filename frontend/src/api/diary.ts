@@ -29,6 +29,12 @@ export function listDiaryForClassSection(classSectionId: number, date: string): 
   return unwrap(apiClient.get("/api/principal/diary", { params: { classSectionId, date } }));
 }
 
+export function exportDiaryXlsx(classSectionId: number, from: string, to: string): Promise<Blob> {
+  return apiClient
+    .get("/api/principal/diary/export", { params: { classSectionId, from, to }, responseType: "blob" })
+    .then((res) => res.data);
+}
+
 export async function downloadDiaryAttachment(diaryEntryId: number, filename: string): Promise<void> {
   const res = await apiClient.get(`/api/diary/${diaryEntryId}/attachment`, { responseType: "blob" });
   const url = URL.createObjectURL(res.data);

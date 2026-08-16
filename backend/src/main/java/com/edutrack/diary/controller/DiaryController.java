@@ -7,6 +7,7 @@ import com.edutrack.diary.service.DiaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,6 +19,8 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 public class DiaryController {
+
+    private static final MediaType XLSX = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
     private final DiaryService diaryService;
 
@@ -54,6 +57,18 @@ public class DiaryController {
             @RequestParam Long classSectionId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ApiResponse.ok(diaryService.listForClassSection(classSectionId, date));
+    }
+
+    @GetMapping("/api/principal/diary/export")
+    public ResponseEntity<byte[]> exportDiary(
+            @RequestParam Long classSectionId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        byte[] xlsx = diaryService.exportDiaryXlsx(classSectionId, from, to);
+        return ResponseEntity.ok()
+                .contentType(XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=diary-" + from + "-to-" + to + ".xlsx")
+                .body(xlsx);
     }
 
     private String sanitize(String filename) {

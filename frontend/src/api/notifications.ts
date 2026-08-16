@@ -12,3 +12,11 @@ export function unreadCount(): Promise<{ count: number }> {
 export function markAllRead(): Promise<void> {
   return unwrap(apiClient.post("/api/notifications/read-all"));
 }
+
+export function dismiss(id: number): Promise<void> {
+  return unwrap(apiClient.delete(`/api/notifications/${id}`));
+}
+
+export function clearAll(): Promise<void> {
+  return unwrap(apiClient.delete("/api/notifications"));
+}

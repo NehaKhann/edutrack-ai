@@ -1,5 +1,5 @@
 import { apiClient, unwrap } from "./client";
-import type { Student } from "../types/roster";
+import type { Student, StudentImportResult } from "../types/roster";
 
 export function listStudents(classSectionId: number): Promise<Student[]> {
   return unwrap(apiClient.get(`/api/class-sections/${classSectionId}/students`));
@@ -15,4 +15,14 @@ export function updateStudent(studentId: number, name: string, rollNumber: strin
 
 export function deactivateStudent(studentId: number): Promise<void> {
   return unwrap(apiClient.delete(`/api/students/${studentId}`));
+}
+
+export function downloadStudentImportTemplate(): Promise<Blob> {
+  return apiClient.get("/api/principal/students/import/template", { responseType: "blob" }).then((res) => res.data);
+}
+
+export function importStudents(file: File): Promise<StudentImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  return unwrap(apiClient.post("/api/principal/students/import", form, { headers: { "Content-Type": "multipart/form-data" } }));
 }

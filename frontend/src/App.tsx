@@ -8,6 +8,7 @@ import { ProfilePage } from "./pages/teacher/ProfilePage";
 import { DiaryPage } from "./pages/teacher/DiaryPage";
 import { AttendancePage } from "./pages/teacher/AttendancePage";
 import { MyAttendancePage } from "./pages/teacher/MyAttendancePage";
+import { LeaveAndSkipPage } from "./pages/teacher/LeaveAndSkipPage";
 import { MyTimetablePage } from "./pages/teacher/MyTimetablePage";
 import { CoverageGridPage } from "./pages/principal/CoverageGridPage";
 import { TeacherDirectoryPage } from "./pages/principal/TeacherDirectoryPage";
@@ -15,8 +16,10 @@ import { DiaryOverviewPage } from "./pages/principal/DiaryOverviewPage";
 import { AttendanceDashboardPage } from "./pages/principal/AttendanceDashboardPage";
 import { TeacherAttendancePage } from "./pages/principal/TeacherAttendancePage";
 import { TimetablePage } from "./pages/principal/TimetablePage";
+import { AuditLogPage } from "./pages/principal/AuditLogPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { SearchPage } from "./pages/SearchPage";
+import { ChatPage } from "./pages/ChatPage";
 import { useAuth } from "./auth/AuthContext";
 import { FullPageSpinner } from "./components/Spinner";
 
@@ -40,6 +43,7 @@ export default function App() {
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/search" element={<SearchPage />} />
+          <Route path="/chat" element={<ChatPage />} />
 
           <Route element={<ProtectedRoute allow={["TEACHER"]} />}>
             <Route path="/teacher/syllabus" element={<SyllabusPage />} />
@@ -48,6 +52,7 @@ export default function App() {
             <Route path="/teacher/diary" element={<DiaryPage />} />
             <Route path="/teacher/attendance" element={<AttendancePage />} />
             <Route path="/teacher/my-attendance" element={<MyAttendancePage />} />
+            <Route path="/teacher/leave" element={<LeaveAndSkipPage />} />
             <Route path="/teacher/timetable" element={<MyTimetablePage />} />
           </Route>
 
@@ -58,6 +63,7 @@ export default function App() {
             <Route path="/principal/diary" element={<DiaryOverviewPage />} />
             <Route path="/principal/attendance" element={<AttendanceDashboardPage />} />
             <Route path="/principal/teacher-attendance" element={<TeacherAttendancePage />} />
+            <Route path="/principal/audit-log" element={<AuditLogPage />} />
           </Route>
         </Route>
       </Route>

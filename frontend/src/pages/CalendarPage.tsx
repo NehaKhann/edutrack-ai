@@ -12,6 +12,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import { Button } from "../components/Button";
 import { Field, TextInput, Select } from "../components/FormFields";
+import { DatePicker } from "../components/DatePicker";
 import { Modal } from "../components/Modal";
 import { Alert } from "../components/Alert";
 import { Spinner } from "../components/Spinner";
@@ -139,6 +140,14 @@ export function CalendarPage() {
     setMonth(now.getMonth() + 1);
   }
 
+  // A wide, symmetric jump range — this calendar holds historical school records as much as future planning.
+  const yearOptions = useMemo(() => {
+    const options: number[] = [];
+    for (let y = now.getFullYear() - 50; y <= now.getFullYear() + 10; y++) options.push(y);
+    return options;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const grid = useMemo(() => {
     const daysInMonth = new Date(year, month, 0).getDate();
     const firstDayJs = new Date(year, month - 1, 1).getDay();
@@ -206,9 +215,20 @@ export function CalendarPage() {
               >
                 <ChevronLeftIcon className="h-5 w-5" />
               </button>
-              <h3 className="w-36 text-center text-sm font-semibold text-slate-800 dark:text-slate-100">
-                {MONTH_NAMES[month - 1]} {year}
-              </h3>
+              <Select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="w-32">
+                {MONTH_NAMES.map((name, i) => (
+                  <option key={name} value={i + 1}>
+                    {name}
+                  </option>
+                ))}
+              </Select>
+              <Select value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-24">
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </Select>
               <button
                 onClick={() => goToMonth(1)}
                 className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/[0.08]"
@@ -535,10 +555,10 @@ function BulkUpdateCard({
       </CardHeader>
       <CardBody className="grid grid-cols-1 gap-3 sm:grid-cols-5">
         <Field label="Start date">
-          <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <DatePicker value={startDate} onChange={(e) => setStartDate(e.target.value)} />
         </Field>
         <Field label="End date">
-          <TextInput type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <DatePicker value={endDate} onChange={(e) => setEndDate(e.target.value)} />
         </Field>
         <Field label="Apply to">
           <Select value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value as DayOfWeek | "")}>

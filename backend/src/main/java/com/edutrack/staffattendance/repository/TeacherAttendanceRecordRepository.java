@@ -11,4 +11,5 @@ public interface TeacherAttendanceRecordRepository extends JpaRepository<Teacher
     Optional<TeacherAttendanceRecord> findByTeacherIdAndAttendanceDate(Long teacherId, LocalDate attendanceDate);
     List<TeacherAttendanceRecord> findByTeacherIdAndAttendanceDateBetween(Long teacherId, LocalDate from, LocalDate to);
     List<TeacherAttendanceRecord> findByTeacherSchoolIdAndAttendanceDate(Long schoolId, LocalDate attendanceDate);
+    List<TeacherAttendanceRecord> findByTeacherSchoolIdAndAttendanceDateBetween(Long schoolId, LocalDate from, LocalDate to);
 }

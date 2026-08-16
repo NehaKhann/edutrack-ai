@@ -1,14 +1,23 @@
 package com.edutrack.face.service;
 
+import com.edutrack.audit.entity.AuditAction;
+import com.edutrack.audit.service.AuditLogService;
 import com.edutrack.common.ApiException;
 import com.edutrack.face.dto.FaceStatusResponse;
 import com.edutrack.face.dto.FaceVerifyResponse;
+import com.edutrack.face.dto.PendingFaceEnrollmentResponse;
+import com.edutrack.face.entity.FaceEnrollmentStatus;
 import com.edutrack.face.entity.TeacherFaceEmbedding;
 import com.edutrack.face.repository.TeacherFaceEmbeddingRepository;
+import com.edutrack.notification.service.NotificationService;
+import com.edutrack.org.entity.Role;
+import com.edutrack.org.entity.User;
 import com.edutrack.org.repository.UserRepository;
+import com.edutrack.security.AuthenticatedUser;
 import com.edutrack.security.CurrentUser;
 import com.edutrack.staffattendance.entity.TeacherAttendanceRecord;
 import com.edutrack.staffattendance.service.TeacherAttendanceService;
+import com.edutrack.storage.FileStorageService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +26,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Client-side face detection + descriptor extraction (face-api.js) feeds this service only the
@@ -40,6 +51,7 @@ public class FaceRecognitionService {
     private static final int EMBEDDING_DIMENSIONS = 128;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCKOUT_DURATION = Duration.ofMinutes(5);
+    private static final List<String> ALLOWED_PHOTO_TYPES = List.of("image/jpeg", "image/png", "image/webp");
 
     /**
      * Similarity at/above which two descriptors are treated as the same person. face-api.js
@@ -52,30 +64,57 @@ public class FaceRecognitionService {
     private final TeacherFaceEmbeddingRepository embeddingRepository;
     private final UserRepository userRepository;
     private final TeacherAttendanceService teacherAttendanceService;
+    private final FileStorageService fileStorageService;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public FaceStatusResponse getMyStatus() {
         Long teacherId = CurrentUser.get().getUserId();
         return embeddingRepository.findByTeacherId(teacherId)
-                .map(e -> new FaceStatusResponse(true, e.getCreatedAt()))
-                .orElseGet(() -> new FaceStatusResponse(false, null));
+                .map(e -> new FaceStatusResponse(true, e.getCreatedAt(), e.getStatus().name(), e.getRejectionReason()))
+                .orElseGet(() -> new FaceStatusResponse(false, null, null, null));
     }
 
-    /** (Re-)enrolls the current teacher's reference face. Always self-service — never accepts a target teacherId. */
+    /**
+     * (Re-)enrolls the current teacher's reference face. Always self-service — never accepts a target
+     * teacherId. Now also requires a photo captured at the same moment as the descriptor, purely so the
+     * Principal has something to visually review before the enrollment becomes usable — ongoing
+     * attendance verification stays descriptor-only, unaffected by this. The new submission always
+     * starts PENDING, even on re-enrollment after a rejection.
+     */
     @Transactional
-    public void enroll(double[] embedding) {
+    public void enroll(double[] embedding, MultipartFile photo) {
         validate(embedding);
-        Long teacherId = CurrentUser.get().getUserId();
+        if (photo == null || photo.isEmpty() || photo.getContentType() == null || !ALLOWED_PHOTO_TYPES.contains(photo.getContentType())) {
+            throw ApiException.badRequest("A JPG, PNG, or WebP photo captured from your camera is required to enroll.");
+        }
+        AuthenticatedUser me = CurrentUser.get();
+        Long teacherId = me.getUserId();
         String json = serialize(embedding);
 
         TeacherFaceEmbedding record = embeddingRepository.findByTeacherId(teacherId)
                 .orElseGet(() -> new TeacherFaceEmbedding(userRepository.findById(teacherId).orElseThrow(), json));
+        String oldPhotoRef = record.getPhotoRef();
         record.setEmbedding(json);
         record.setFailedAttempts(0);
         record.setLockedUntil(null);
+        record.setPhotoRef(fileStorageService.store(photo, "face-enrollment"));
+        record.setStatus(FaceEnrollmentStatus.PENDING);
+        record.setReviewedBy(null);
+        record.setReviewedAt(null);
+        record.setRejectionReason(null);
         record.setUpdatedAt(Instant.now());
         embeddingRepository.save(record);
+        if (oldPhotoRef != null) {
+            fileStorageService.delete(oldPhotoRef);
+        }
+
+        User teacher = userRepository.findById(teacherId).orElseThrow();
+        for (User principal : userRepository.findBySchoolIdAndRoleAndActive(me.getSchoolId(), Role.PRINCIPAL, true)) {
+            notificationService.notify(principal, teacher.getName() + " submitted a face enrollment for review.", "/principal/teacher-directory");
+        }
     }
 
     /** Verifies the current teacher's live scan against their enrolled reference; marks Present on a match. */
@@ -87,6 +126,15 @@ public class FaceRecognitionService {
         TeacherFaceEmbedding record = embeddingRepository.findByTeacherId(teacherId)
                 .orElseThrow(() -> ApiException.badRequest(
                         "You haven't enrolled your face yet. Enroll first, then scan to mark attendance."));
+
+        if (record.getStatus() == FaceEnrollmentStatus.PENDING) {
+            throw ApiException.badRequest("Your face enrollment is still awaiting your Principal's approval.");
+        }
+        if (record.getStatus() == FaceEnrollmentStatus.REJECTED) {
+            String reason = record.getRejectionReason();
+            throw ApiException.badRequest("Your last face enrollment was rejected"
+                    + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "") + " — please re-enroll.");
+        }
 
         if (record.getLockedUntil() != null && record.getLockedUntil().isAfter(Instant.now())) {
             long minutesLeft = Math.max(1, Duration.between(Instant.now(), record.getLockedUntil()).toMinutes() + 1);
@@ -114,6 +162,69 @@ public class FaceRecognitionService {
         }
         embeddingRepository.save(record);
         return new FaceVerifyResponse(false, round(similarity), null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PendingFaceEnrollmentResponse> listPendingEnrollments() {
+        Long schoolId = CurrentUser.get().getSchoolId();
+        return embeddingRepository.findByTeacher_School_IdAndStatusOrderByUpdatedAtAsc(schoolId, FaceEnrollmentStatus.PENDING).stream()
+                .map(PendingFaceEnrollmentResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] getEnrollmentPhotoBytes(Long teacherId) {
+        TeacherFaceEmbedding record = getOwnedEnrollment(teacherId);
+        if (record.getPhotoRef() == null) {
+            throw ApiException.notFound("No enrollment photo on file");
+        }
+        return fileStorageService.load(record.getPhotoRef());
+    }
+
+    /** Best-effort content type derived from the stored file's extension — same approach as {@code TeacherProfileService.getPhotoContentType}. */
+    @Transactional(readOnly = true)
+    public String getEnrollmentPhotoContentType(Long teacherId) {
+        TeacherFaceEmbedding record = getOwnedEnrollment(teacherId);
+        String ref = record.getPhotoRef();
+        if (ref == null) throw ApiException.notFound("No enrollment photo on file");
+        String lower = ref.toLowerCase();
+        if (lower.endsWith(".png")) return "image/png";
+        if (lower.endsWith(".webp")) return "image/webp";
+        return "image/jpeg";
+    }
+
+    /** Principal-only. Approving makes the enrollment usable for attendance verification; rejecting requires the teacher to re-enroll. */
+    @Transactional
+    public void reviewEnrollment(Long teacherId, boolean approve, String reason) {
+        TeacherFaceEmbedding record = getOwnedEnrollment(teacherId);
+        if (record.getStatus() != FaceEnrollmentStatus.PENDING) {
+            throw ApiException.conflict("This enrollment has already been reviewed");
+        }
+        User reviewer = userRepository.findById(CurrentUser.get().getUserId()).orElseThrow();
+        record.setStatus(approve ? FaceEnrollmentStatus.APPROVED : FaceEnrollmentStatus.REJECTED);
+        record.setReviewedBy(reviewer);
+        record.setReviewedAt(Instant.now());
+        record.setRejectionReason(approve ? null : reason);
+        embeddingRepository.save(record);
+
+        String message = approve
+                ? "Your face enrollment was approved — you can now scan your face to mark attendance."
+                : "Your face enrollment was rejected" + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "") + " — please re-enroll.";
+        notificationService.notify(record.getTeacher(), message, "/teacher/my-attendance");
+
+        auditLogService.record(
+                approve ? AuditAction.FACE_ENROLLMENT_APPROVED : AuditAction.FACE_ENROLLMENT_REJECTED,
+                "TEACHER", teacherId, record.getTeacher().getName(),
+                approve ? "Face enrollment approved" : "Face enrollment rejected" + (reason != null && !reason.isBlank() ? " (" + reason + ")" : "")
+        );
+    }
+
+    private TeacherFaceEmbedding getOwnedEnrollment(Long teacherId) {
+        TeacherFaceEmbedding record = embeddingRepository.findByTeacherId(teacherId)
+                .orElseThrow(() -> ApiException.notFound("No face enrollment found for this teacher"));
+        if (!record.getTeacher().getSchool().getId().equals(CurrentUser.get().getSchoolId())) {
+            throw ApiException.notFound("No face enrollment found for this teacher");
+        }
+        return record;
     }
 
     /** Standard cosine similarity: dot(a,b) / (||a|| * ||b||), in [-1, 1] for arbitrary vectors. */

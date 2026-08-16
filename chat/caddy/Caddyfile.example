@@ -1,0 +1,11 @@
+# Copy to Caddyfile (gitignored) and replace CHANGE_ME.example with your real domain.
+# Caddy handles Let's Encrypt SSL automatically — nothing else to configure for HTTPS.
+
+chat.CHANGE_ME.example {
+	reverse_proxy /_matrix/* synapse:8008
+	reverse_proxy /_synapse/client/* synapse:8008
+}
+
+element.CHANGE_ME.example {
+	reverse_proxy element-web:80
+}

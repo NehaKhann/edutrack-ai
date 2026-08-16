@@ -1,8 +1,11 @@
 import { apiClient, unwrap } from "./client";
 import type {
+  AttendanceCorrectionRequest,
+  AttendancePolicy,
   LeaveBalance,
   LeaveRequest,
   LeaveType,
+  MyAttendanceSummary,
   MyTodayStatus,
   SkippedClassReport,
   TeacherAttendanceDetail,
@@ -14,8 +17,64 @@ export function getMyTodayStatus(): Promise<MyTodayStatus> {
   return unwrap(apiClient.get("/api/teacher-attendance/me"));
 }
 
+export function exportAttendanceXlsx(from: string, to: string): Promise<Blob> {
+  return apiClient.get("/api/principal/teacher-attendance/export", { params: { from, to }, responseType: "blob" }).then((res) => res.data);
+}
+
+export function exportLeaveXlsx(from: string, to: string): Promise<Blob> {
+  return apiClient.get("/api/principal/leave-requests/export", { params: { from, to }, responseType: "blob" }).then((res) => res.data);
+}
+
+export function getMyAttendanceSummary(): Promise<MyAttendanceSummary> {
+  return unwrap(apiClient.get("/api/teacher-attendance/me/summary"));
+}
+
 export function setMyTeacherStatus(status: TeacherAttendanceStatus): Promise<void> {
   return unwrap(apiClient.post("/api/teacher-attendance/me", { status }));
+}
+
+export function markPresentViaFingerprint(): Promise<void> {
+  return unwrap(apiClient.post("/api/teacher-attendance/me/fingerprint"));
+}
+
+export function getAttendancePolicy(): Promise<AttendancePolicy> {
+  return unwrap(apiClient.get("/api/teacher-attendance/policy"));
+}
+
+export function updateAttendancePolicy(cutoffTime: string, autoAbsentTime: string): Promise<AttendancePolicy> {
+  return unwrap(apiClient.put("/api/principal/attendance-policy", { cutoffTime, autoAbsentTime }));
+}
+
+export function overrideTeacherStatus(teacherId: number, status: TeacherAttendanceStatus, time: string): Promise<void> {
+  return unwrap(apiClient.post(`/api/principal/teacher-attendance/${teacherId}/override`, { status, time }));
+}
+
+export function submitCorrectionRequest(params: {
+  attendanceDate: string;
+  requestedStatus?: TeacherAttendanceStatus;
+  reason: string;
+}): Promise<AttendanceCorrectionRequest> {
+  return unwrap(apiClient.post("/api/attendance-corrections", params));
+}
+
+export function listMyCorrectionRequests(): Promise<AttendanceCorrectionRequest[]> {
+  return unwrap(apiClient.get("/api/attendance-corrections/mine"));
+}
+
+export function cancelCorrectionRequest(id: number): Promise<AttendanceCorrectionRequest> {
+  return unwrap(apiClient.post(`/api/attendance-corrections/${id}/cancel`));
+}
+
+export function listPendingCorrections(): Promise<AttendanceCorrectionRequest[]> {
+  return unwrap(apiClient.get("/api/principal/attendance-corrections/pending"));
+}
+
+export function approveCorrectionRequest(id: number): Promise<AttendanceCorrectionRequest> {
+  return unwrap(apiClient.post(`/api/principal/attendance-corrections/${id}/approve`));
+}
+
+export function rejectCorrectionRequest(id: number): Promise<AttendanceCorrectionRequest> {
+  return unwrap(apiClient.post(`/api/principal/attendance-corrections/${id}/reject`));
 }
 
 export function applyForLeave(params: {

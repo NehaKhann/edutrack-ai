@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { PlusIcon, TrashIcon, UsersIcon, Squares2X2Icon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, UsersIcon, Squares2X2Icon, ArrowUpTrayIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import clsx from "clsx";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
 import { Field, TextInput, Select } from "../../components/FormFields";
+import { DatePicker } from "../../components/DatePicker";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { Spinner } from "../../components/Spinner";
@@ -20,7 +21,8 @@ import * as classSectionsApi from "../../api/classSections";
 import { listClassSections } from "../../api/classSections";
 import { errorMessage } from "../../api/client";
 import { formatDate } from "../../utils/date";
-import type { ClassSectionSummary, Student } from "../../types/roster";
+import { downloadBlob } from "../../lib/download";
+import type { ClassSectionSummary, Student, StudentImportResult } from "../../types/roster";
 import type { ClassAttendanceSummary, StudentAttendanceRow } from "../../types/attendance";
 
 function today(): string {
@@ -113,30 +115,8 @@ export function AttendanceDashboardPage() {
       <Card className="mb-4">
         <CardBody className="flex flex-wrap items-end gap-3">
           <Field label="Date">
-            <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+            <DatePicker value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
           </Field>
-          <button
-            onClick={() => setOnlyNotMarked((v) => !v)}
-            className={clsx(
-              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-              onlyNotMarked
-                ? "border-transparent bg-brand-600 text-white"
-                : "border-slate-300 bg-white/80 text-slate-600 hover:border-brand-400 dark:border-white/15 dark:bg-white/5 dark:text-slate-300"
-            )}
-          >
-            Only not marked
-          </button>
-          <button
-            onClick={() => setLowAttendance((v) => !v)}
-            className={clsx(
-              "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-              lowAttendance
-                ? "border-transparent bg-brand-600 text-white"
-                : "border-slate-300 bg-white/80 text-slate-600 hover:border-brand-400 dark:border-white/15 dark:bg-white/5 dark:text-slate-300"
-            )}
-          >
-            Low attendance (&lt;90%)
-          </button>
         </CardBody>
       </Card>
 
@@ -178,8 +158,39 @@ export function AttendanceDashboardPage() {
       </Card>
 
       <Card className="overflow-hidden">
-        <CardHeader>
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">All Classes — {formatDate(date)}</h3>
+        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            All Classes — {formatDate(date)}
+            {!loading && (onlyNotMarked || lowAttendance) && (
+              <span className="ml-1.5 font-normal text-slate-400 dark:text-slate-500">
+                ({filtered.length} of {totalClasses})
+              </span>
+            )}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setOnlyNotMarked((v) => !v)}
+              className={clsx(
+                "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                onlyNotMarked
+                  ? "border-transparent bg-brand-600 text-white"
+                  : "border-slate-300 bg-white/80 text-slate-600 hover:border-brand-400 dark:border-white/15 dark:bg-white/5 dark:text-slate-300"
+              )}
+            >
+              Only not marked
+            </button>
+            <button
+              onClick={() => setLowAttendance((v) => !v)}
+              className={clsx(
+                "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                lowAttendance
+                  ? "border-transparent bg-brand-600 text-white"
+                  : "border-slate-300 bg-white/80 text-slate-600 hover:border-brand-400 dark:border-white/15 dark:bg-white/5 dark:text-slate-300"
+              )}
+            >
+              Low attendance (&lt;90%)
+            </button>
+          </div>
         </CardHeader>
         {loading ? (
           <div className="flex justify-center py-8">
@@ -324,6 +335,7 @@ function RosterModal({ onClose }: { onClose: () => void }) {
   const [adding, setAdding] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     listClassSections()
@@ -334,7 +346,7 @@ function RosterModal({ onClose }: { onClose: () => void }) {
       .catch((e) => setError(errorMessage(e)));
   }, []);
 
-  useEffect(() => {
+  function refreshStudents() {
     if (!classSectionId) return;
     setLoading(true);
     studentsApi
@@ -342,7 +354,9 @@ function RosterModal({ onClose }: { onClose: () => void }) {
       .then(setStudents)
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
-  }, [classSectionId]);
+  }
+
+  useEffect(refreshStudents, [classSectionId]);
 
   async function handleAdd() {
     if (!classSectionId || !name.trim() || !rollNumber.trim()) return;
@@ -380,7 +394,14 @@ function RosterModal({ onClose }: { onClose: () => void }) {
           <Alert type="error">{error}</Alert>
         </div>
       )}
-      <ClassSectionPicker classSections={classSections} value={classSectionId} onChange={setClassSectionId} />
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex-1">
+          <ClassSectionPicker classSections={classSections} value={classSectionId} onChange={setClassSectionId} />
+        </div>
+        <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
+          <ArrowUpTrayIcon className="h-4 w-4" /> Import
+        </Button>
+      </div>
 
       <div className="mt-4 flex items-end gap-2">
         <Field label="Name">
@@ -433,6 +454,119 @@ function RosterModal({ onClose }: { onClose: () => void }) {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {importOpen && (
+        <ImportStudentsModal
+          onClose={() => setImportOpen(false)}
+          onImported={refreshStudents}
+        />
+      )}
+    </Modal>
+  );
+}
+
+function ImportStudentsModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<StudentImportResult | null>(null);
+
+  async function handleDownloadTemplate() {
+    setDownloadingTemplate(true);
+    try {
+      const blob = await studentsApi.downloadStudentImportTemplate();
+      downloadBlob(blob, "student-import-template.xlsx");
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  }
+
+  async function handleImport() {
+    if (!file) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const res = await studentsApi.importStudents(file);
+      setResult(res);
+      onImported();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="Import Students" widthClass="max-w-lg">
+      <div className="space-y-4">
+        {error && <Alert type="error">{error}</Alert>}
+
+        {!result ? (
+          <>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Upload an .xlsx file with one student per row (Class, Section, Roll Number, Name). The class and section must already
+              exist. Download the template below to see the expected columns.
+            </p>
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              disabled={downloadingTemplate}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600 hover:underline dark:text-brand-400"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" /> Download template
+            </button>
+            <input
+              type="file"
+              accept=".xlsx"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 dark:text-slate-300 dark:file:bg-white/10 dark:file:text-slate-200"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleImport} loading={importing} disabled={!file}>
+                <ArrowUpTrayIcon className="h-4 w-4" /> Import
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Alert type={result.created > 0 ? "success" : "warning"}>
+              {result.created} student{result.created === 1 ? "" : "s"} added
+              {result.skipped.length > 0 ? `, ${result.skipped.length} row${result.skipped.length === 1 ? "" : "s"} skipped` : ""}.
+            </Alert>
+
+            {result.skipped.length > 0 && (
+              <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-100 dark:border-white/10">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-white/[0.04] dark:text-slate-400">
+                    <tr>
+                      <th className="px-4 py-2.5">Row</th>
+                      <th className="px-4 py-2.5">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/[0.08]">
+                    {result.skipped.map((s) => (
+                      <tr key={s.row}>
+                        <td className="px-4 py-2.5">{s.row}</td>
+                        <td className="px-4 py-2.5 text-coral-600 dark:text-coral-400">{s.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button onClick={onClose}>Done</Button>
+            </div>
+          </>
+        )}
+      </div>
     </Modal>
   );
 }

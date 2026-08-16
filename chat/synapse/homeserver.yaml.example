@@ -1,0 +1,63 @@
+# Synapse homeserver config template.
+#
+# Copy this to `homeserver.yaml` (gitignored — it will hold real secrets) and fill in every
+# CHANGE_ME placeholder. server_name CANNOT be changed after your first user registers — it's
+# permanently baked into every user ID (@teacher:your-domain) and room ID, so pick the real
+# domain before going further.
+
+server_name: "chat.CHANGE_ME.example"
+pid_file: /data/homeserver.pid
+
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true # required — Caddy sits in front of this
+    resources:
+      - names: [client]
+        compress: false
+
+database:
+  name: psycopg2
+  args:
+    user: synapse
+    password: "CHANGE_ME_SYNAPSE_DB_PASSWORD" # must match SYNAPSE_DB_PASSWORD in ../.env
+    database: synapse
+    host: postgres
+    port: 5432
+    cp_min: 5
+    cp_max: 10
+
+log_config: "/data/log.config"
+media_store_path: /data/media_store
+max_upload_size: 100M
+url_preview_enabled: false
+
+# --- Invite-only: no public sign-up, ever ---
+enable_registration: false
+enable_registration_without_verification: false
+# Generate with: openssl rand -hex 32 — used only by the register_new_matrix_user CLI
+# (see ../scripts/create-user.sh), never exposed to the public internet.
+registration_shared_secret: "CHANGE_ME_REGISTRATION_SECRET"
+allow_guest_access: false
+
+# --- No federation — this is a private, single-school homeserver, not part of the public
+# Matrix network. No other server can ever push data in or pull it out. ---
+federation_domain_whitelist: []
+trusted_key_servers: []
+
+# --- Voice/video calls (coturn) ---
+turn_uris:
+  - "turn:chat.CHANGE_ME.example:3478?transport=udp"
+  - "turn:chat.CHANGE_ME.example:3478?transport=tcp"
+# Generate with: openssl rand -hex 32 — must match static-auth-secret in ../coturn/turnserver.conf
+turn_shared_secret: "CHANGE_ME_TURN_SECRET"
+turn_user_lifetime: 86400000
+turn_allow_guests: false
+
+# signing.key is auto-generated on first boot if it doesn't exist — nothing to fill in here.
+signing_key_path: "/data/signing.key"
+
+report_stats: false
+enable_metrics: false
+suppress_key_server_warning: true

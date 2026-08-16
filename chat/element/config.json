@@ -1,0 +1,14 @@
+{
+  "default_server_config": {
+    "m.homeserver": {
+      "base_url": "https://chat.CHANGE_ME.example",
+      "server_name": "chat.CHANGE_ME.example"
+    }
+  },
+  "brand": "Metropolitan School Chat",
+  "disable_custom_urls": true,
+  "disable_guests": true,
+  "disable_3pid_login": true,
+  "default_theme": "light",
+  "show_labs_settings": false
+}

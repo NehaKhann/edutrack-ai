@@ -1,5 +1,5 @@
 import { apiClient, unwrap } from "./client";
-import type { TeacherAccount, TeacherDirectoryEntry, TeacherProfile } from "../types/profile";
+import type { TeacherAccount, TeacherDirectoryEntry, TeacherImportResult, TeacherProfile } from "../types/profile";
 
 export function getMyProfile(): Promise<TeacherProfile> {
   return unwrap(apiClient.get("/api/teacher-profiles/me"));
@@ -73,4 +73,18 @@ export function createAccount(payload: { name: string; email: string; phone: str
   if (payload.phone) form.append("phone", payload.phone);
   if (payload.cv) form.append("cv", payload.cv);
   return unwrap(apiClient.post("/api/principal/teacher-profiles/accounts", form, { headers: { "Content-Type": "multipart/form-data" } }));
+}
+
+export function resetPassword(teacherId: number): Promise<TeacherAccount> {
+  return unwrap(apiClient.post(`/api/principal/teacher-profiles/${teacherId}/reset-password`));
+}
+
+export function downloadTeacherImportTemplate(): Promise<Blob> {
+  return apiClient.get("/api/principal/teacher-profiles/import/template", { responseType: "blob" }).then((res) => res.data);
+}
+
+export function importTeachers(file: File): Promise<TeacherImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  return unwrap(apiClient.post("/api/principal/teacher-profiles/import", form, { headers: { "Content-Type": "multipart/form-data" } }));
 }

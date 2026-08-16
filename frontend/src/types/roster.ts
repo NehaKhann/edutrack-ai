@@ -17,3 +17,13 @@ export interface TeacherSummary {
   id: number;
   name: string;
 }
+
+export interface ImportSkippedRow {
+  row: number;
+  reason: string;
+}
+
+export interface StudentImportResult {
+  created: number;
+  skipped: ImportSkippedRow[];
+}

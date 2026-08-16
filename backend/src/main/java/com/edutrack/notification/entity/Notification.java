@@ -26,6 +26,9 @@ public class Notification {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String message;
 
+    /** Optional deep link (e.g. "/chat?conversationId=5") the frontend navigates to when this notification is clicked. */
+    private String link;
+
     @Column(nullable = false)
     private boolean read = false;
 
@@ -35,5 +38,11 @@ public class Notification {
     public Notification(User recipient, String message) {
         this.recipient = recipient;
         this.message = message;
+    }
+
+    public Notification(User recipient, String message, String link) {
+        this.recipient = recipient;
+        this.message = message;
+        this.link = link;
     }
 }

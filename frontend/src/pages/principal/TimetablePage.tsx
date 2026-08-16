@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { CalendarDaysIcon } from "@heroicons/react/24/outline";
+import { CalendarDaysIcon, ArrowDownTrayIcon } from "@heroicons/react/24/outline";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody } from "../../components/Card";
+import { Button } from "../../components/Button";
 import { Alert } from "../../components/Alert";
 import { EmptyState } from "../../components/EmptyState";
 import { SkeletonRows } from "../../components/Skeleton";
@@ -14,6 +15,7 @@ import * as timetableApi from "../../api/timetable";
 import { listClassSections } from "../../api/classSections";
 import { listTeachers } from "../../api/teachers";
 import { errorMessage } from "../../api/client";
+import { downloadBlob } from "../../lib/download";
 import type { ClassSectionSummary, TeacherSummary } from "../../types/roster";
 import type { Subject } from "../../types";
 import type { ClassTimetable, TeacherTimetable, TimetableEntry, Weekday } from "../../types/timetable";
@@ -48,6 +50,7 @@ export function TimetablePage() {
   const [teacherLoading, setTeacherLoading] = useState(false);
 
   const [editing, setEditing] = useState<{ day: Weekday; period: number; entry?: TimetableEntry } | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     listClassSections()
@@ -121,6 +124,25 @@ export function TimetablePage() {
     }
   }
 
+  async function handleExport() {
+    setExporting(true);
+    try {
+      if (view === "class" && selectedClassId != null) {
+        const label = classSections.find((c) => c.id === selectedClassId)?.name ?? "class";
+        const blob = await timetableApi.exportClassTimetableXlsx(selectedClassId);
+        downloadBlob(blob, `timetable-${label.replace(/\s+/g, "-")}.xlsx`);
+      } else if (view === "teacher" && selectedTeacherId != null) {
+        const label = teachers.find((t) => t.id === selectedTeacherId)?.name ?? "teacher";
+        const blob = await timetableApi.exportTeacherTimetableXlsx(selectedTeacherId);
+        downloadBlob(blob, `timetable-${label.replace(/\s+/g, "-")}.xlsx`);
+      }
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const classOptions: CellEditorOption[] = classSubjects.map((s) => ({ subjectId: s.id, label: `${s.name} — ${s.teacherName}` }));
   const teacherOptions: CellEditorOption[] = teacherSubjects.map((s) => ({
     subjectId: s.id,
@@ -133,14 +155,25 @@ export function TimetablePage() {
         title="Timetable"
         description="Assign subjects and teachers to each period. Class timetables and teacher timetables stay in sync automatically."
         actions={
-          <SegmentedControl
-            value={view}
-            onChange={setView}
-            options={[
-              { value: "class", label: "By Class", activeClass: "bg-brand-600 text-white" },
-              { value: "teacher", label: "By Teacher", activeClass: "bg-brand-600 text-white" },
-            ]}
-          />
+          <div className="flex items-center gap-2">
+            <SegmentedControl
+              value={view}
+              onChange={setView}
+              options={[
+                { value: "class", label: "By Class", activeClass: "bg-brand-600 text-white" },
+                { value: "teacher", label: "By Teacher", activeClass: "bg-brand-600 text-white" },
+              ]}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExport}
+              loading={exporting}
+              disabled={view === "class" ? selectedClassId == null : selectedTeacherId == null}
+            >
+              <ArrowDownTrayIcon className="h-4 w-4" /> Export
+            </Button>
+          </div>
         }
       />
 

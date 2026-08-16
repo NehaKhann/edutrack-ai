@@ -3,7 +3,9 @@ package com.edutrack.profile.controller;
 import com.edutrack.common.ApiResponse;
 import com.edutrack.profile.dto.TeacherAccountResponse;
 import com.edutrack.profile.dto.TeacherDirectoryEntry;
+import com.edutrack.profile.dto.TeacherImportResultResponse;
 import com.edutrack.profile.dto.TeacherProfileResponse;
+import com.edutrack.profile.service.TeacherImportService;
 import com.edutrack.profile.service.TeacherProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -19,7 +21,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PrincipalTeacherDirectoryController {
 
+    private static final MediaType XLSX = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
     private final TeacherProfileService teacherProfileService;
+    private final TeacherImportService teacherImportService;
 
     @GetMapping
     public ApiResponse<List<TeacherDirectoryEntry>> directory() {
@@ -45,6 +50,19 @@ public class PrincipalTeacherDirectoryController {
         return ApiResponse.ok(teacherProfileService.createTeacherAccount(name, email, phone, cv), "Teacher account created");
     }
 
+    @GetMapping("/import/template")
+    public ResponseEntity<byte[]> importTemplate() {
+        return ResponseEntity.ok()
+                .contentType(XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=teacher-import-template.xlsx")
+                .body(teacherImportService.downloadTemplate());
+    }
+
+    @PostMapping(value = "/import", consumes = "multipart/form-data")
+    public ApiResponse<TeacherImportResultResponse> importTeachers(@RequestParam MultipartFile file) {
+        return ApiResponse.ok(teacherImportService.importXlsx(file));
+    }
+
     @GetMapping("/{teacherId}")
     public ApiResponse<TeacherProfileResponse> detail(@PathVariable Long teacherId) {
         return ApiResponse.ok(teacherProfileService.getProfileFor(teacherId));
@@ -64,6 +82,11 @@ public class PrincipalTeacherDirectoryController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + sanitize(filename) + "\"")
                 .body(bytes);
+    }
+
+    @PostMapping("/{teacherId}/reset-password")
+    public ApiResponse<TeacherAccountResponse> resetPassword(@PathVariable Long teacherId) {
+        return ApiResponse.ok(teacherProfileService.resetPassword(teacherId), "Password reset");
     }
 
     @PostMapping("/{teacherId}/deactivate")

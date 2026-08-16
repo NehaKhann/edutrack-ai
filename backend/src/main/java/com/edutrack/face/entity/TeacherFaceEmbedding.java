@@ -10,8 +10,10 @@ import java.time.Instant;
 
 /**
  * Stores one teacher's reference face embedding (a 128-dimensional descriptor produced by
- * face-api.js's faceRecognitionNet, client-side). The raw face image never reaches the server —
- * only this numeric vector, which cannot be reversed back into a photo.
+ * face-api.js's faceRecognitionNet, client-side). Ongoing attendance verification stays
+ * descriptor-only, same as before. Enrollment itself now also captures a real photo (see
+ * {@link #photoRef}) purely so the Principal has something to visually review before an
+ * enrollment becomes usable — a new gate this class didn't previously have.
  */
 @Entity
 @Table(name = "teacher_face_embedding")
@@ -38,6 +40,24 @@ public class TeacherFaceEmbedding {
 
     @Column(name = "locked_until")
     private Instant lockedUntil;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private FaceEnrollmentStatus status = FaceEnrollmentStatus.PENDING;
+
+    /** Storage ref for the photo captured at enrollment time, shown only to the Principal for review. Null for rows grandfathered in before this feature existed. */
+    @Column(name = "photo_ref", length = 500)
+    private String photoRef;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewed_by")
+    private User reviewedBy;
+
+    @Column(name = "reviewed_at")
+    private Instant reviewedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();

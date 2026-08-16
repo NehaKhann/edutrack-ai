@@ -4,6 +4,7 @@ import com.edutrack.org.entity.ClassSection;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ClassSectionRepository extends JpaRepository<ClassSection, Long> {
     List<ClassSection> findBySchoolId(Long schoolId);
@@ -13,4 +14,8 @@ public interface ClassSectionRepository extends JpaRepository<ClassSection, Long
     boolean existsBySchoolIdAndClassNameIgnoreCaseAndSectionNameIgnoreCase(Long schoolId, String className, String sectionName);
 
     boolean existsBySchoolIdAndClassNameIgnoreCaseAndSectionNameIsNull(Long schoolId, String className);
+
+    Optional<ClassSection> findBySchoolIdAndClassNameIgnoreCaseAndSectionNameIgnoreCase(Long schoolId, String className, String sectionName);
+
+    Optional<ClassSection> findBySchoolIdAndClassNameIgnoreCaseAndSectionNameIsNull(Long schoolId, String className);
 }

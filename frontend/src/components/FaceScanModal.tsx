@@ -14,7 +14,7 @@ type ScanState =
   | "camera-error"
   | "scanning"
   | "processing"
-  | "enroll-success"
+  | "enroll-pending"
   | "verify-success"
   | "no-match"
   | "locked-out"
@@ -34,6 +34,7 @@ interface Props {
 
 export function FaceScanModal({ mode, onClose, onEnrolled, onVerified }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const detectionTimerRef = useRef<number | null>(null);
   const noFaceTimeoutRef = useRef<number | null>(null);
@@ -124,6 +125,27 @@ export function FaceScanModal({ mode, onClose, onEnrolled, onVerified }: Props) 
     }, DETECTION_INTERVAL_MS);
   }
 
+  /** Grabs a still frame from the already-live video stream — same canvas-draw-to-blob technique used by the chat camera capture modal. */
+  function captureStillFrame(): Promise<Blob | null> {
+    return new Promise((resolve) => {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      if (!video || !canvas) {
+        resolve(null);
+        return;
+      }
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(null);
+        return;
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
+    });
+  }
+
   async function capture() {
     if (detectionTimerRef.current) window.clearInterval(detectionTimerRef.current);
     if (noFaceTimeoutRef.current) window.clearTimeout(noFaceTimeoutRef.current);
@@ -146,23 +168,27 @@ export function FaceScanModal({ mode, onClose, onEnrolled, onVerified }: Props) 
       }
 
       const embedding = Array.from(detection.descriptor);
-      stopCamera();
 
       if (mode === "enroll") {
-        await faceApi.enrollFace(embedding);
+        const photo = await captureStillFrame();
+        stopCamera();
+        if (!photo) throw new Error("Could not capture a photo — please try again.");
+        await faceApi.enrollFace(embedding, photo);
         if (!mountedRef.current) return;
-        setState("enroll-success");
+        setState("enroll-pending");
         onEnrolled?.();
+        return;
+      }
+
+      stopCamera();
+      const result = await faceApi.verifyFace(embedding);
+      if (!mountedRef.current) return;
+      setSimilarity(result.similarity);
+      if (result.matched && result.markedAt) {
+        setState("verify-success");
+        onVerified?.({ similarity: result.similarity, markedAt: result.markedAt });
       } else {
-        const result = await faceApi.verifyFace(embedding);
-        if (!mountedRef.current) return;
-        setSimilarity(result.similarity);
-        if (result.matched && result.markedAt) {
-          setState("verify-success");
-          onVerified?.({ similarity: result.similarity, markedAt: result.markedAt });
-        } else {
-          setState("no-match");
-        }
+        setState("no-match");
       }
     } catch (e) {
       if (!mountedRef.current) return;
@@ -205,12 +231,13 @@ export function FaceScanModal({ mode, onClose, onEnrolled, onVerified }: Props) 
             className={`h-full w-full object-cover ${state === "scanning" || state === "processing" ? "block" : "hidden"}`}
             style={{ transform: "scaleX(-1)" }}
           />
+          <canvas ref={canvasRef} className="hidden" />
           {(state === "loading-models" || state === "requesting-camera" || state === "processing") && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/60 dark:bg-navy-900/60">
               <Spinner className="h-8 w-8" />
             </div>
           )}
-          {state === "enroll-success" || state === "verify-success" ? (
+          {state === "enroll-pending" || state === "verify-success" ? (
             <CheckCircleIcon className="h-16 w-16 text-teal-500" />
           ) : state === "camera-error" || state === "no-match" || state === "locked-out" || state === "server-error" ? (
             <ExclamationTriangleIcon className="h-14 w-14 text-coral-500" />
@@ -231,7 +258,12 @@ export function FaceScanModal({ mode, onClose, onEnrolled, onVerified }: Props) 
             <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Multiple faces detected — make sure only you are in frame</p>
           )}
           {state === "processing" && <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Verifying…</p>}
-          {state === "enroll-success" && <p className="text-sm font-semibold text-teal-600 dark:text-teal-400">Face enrolled successfully</p>}
+          {state === "enroll-pending" && (
+            <div>
+              <p className="text-sm font-semibold text-teal-600 dark:text-teal-400">Submitted for review</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Your Principal will approve your photo before face-scan attendance is enabled.</p>
+            </div>
+          )}
           {state === "verify-success" && (
             <p className="text-sm font-semibold text-teal-600 dark:text-teal-400">
               Identity verified{similarity !== null && <span className="font-normal text-slate-500 dark:text-slate-400"> · {(similarity * 100).toFixed(1)}% match</span>}
@@ -247,6 +279,12 @@ export function FaceScanModal({ mode, onClose, onEnrolled, onVerified }: Props) 
           {(state === "camera-error" || state === "server-error") && <p className="text-sm text-coral-600 dark:text-coral-400">{errorText}</p>}
         </div>
 
+        {mode === "enroll" && (state === "loading-models" || state === "requesting-camera" || state === "scanning" || state === "processing") && (
+          <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+            A photo will be captured and shared with your Principal to verify your identity before attendance scanning is enabled.
+          </p>
+        )}
+
         {/* Actions */}
         <div className="mt-4 flex w-full gap-2">
           {(state === "camera-error" || state === "no-match" || state === "server-error") && (
@@ -254,9 +292,9 @@ export function FaceScanModal({ mode, onClose, onEnrolled, onVerified }: Props) 
               Try Again
             </Button>
           )}
-          {(state === "enroll-success" || state === "verify-success" || state === "locked-out" || state === "camera-error" || state === "no-match" || state === "server-error") && (
+          {(state === "enroll-pending" || state === "verify-success" || state === "locked-out" || state === "camera-error" || state === "no-match" || state === "server-error") && (
             <Button className="flex-1 justify-center" onClick={onClose}>
-              {state === "enroll-success" || state === "verify-success" ? "Done" : "Close"}
+              {state === "enroll-pending" || state === "verify-success" ? "Done" : "Close"}
             </Button>
           )}
           {(state === "loading-models" || state === "requesting-camera" || state === "scanning" || state === "processing") && (

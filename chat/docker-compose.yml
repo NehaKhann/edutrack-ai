@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: synapse
+      POSTGRES_USER: synapse
+      POSTGRES_PASSWORD: ${SYNAPSE_DB_PASSWORD}
+      # Synapse requires C collation — this cannot be changed after the DB is created.
+      POSTGRES_INITDB_ARGS: "--lc-collate=C --lc-ctype=C"
+    volumes:
+      - synapse-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U synapse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SYNAPSE_CONFIG_PATH: /data/homeserver.yaml
+      UID: "991"
+      GID: "991"
+    volumes:
+      - ./synapse:/data
+      - synapse-media:/data/media_store
+    expose:
+      - "8008"
+
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    # host networking is the standard way to run coturn — it needs the full relay port
+    # range reachable directly, which Docker's default bridge networking can't expose cleanly.
+    network_mode: host
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+
+  element-web:
+    image: vectorim/element-web:latest
+    restart: unless-stopped
+    volumes:
+      - ./element/config.json:/app/config.json:ro
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - synapse
+      - element-web
+
+volumes:
+  synapse-postgres-data:
+  synapse-media:
+  caddy-data:
+  caddy-config:

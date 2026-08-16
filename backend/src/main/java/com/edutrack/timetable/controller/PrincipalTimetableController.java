@@ -9,6 +9,9 @@ import com.edutrack.timetable.dto.TimetableCellUpsertRequest;
 import com.edutrack.timetable.service.TimetableService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +20,8 @@ import java.util.List;
 @RequestMapping("/api/principal/timetable")
 @RequiredArgsConstructor
 public class PrincipalTimetableController {
+
+    private static final MediaType XLSX = MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
     private final TimetableService timetableService;
 
@@ -45,5 +50,23 @@ public class PrincipalTimetableController {
     @GetMapping("/teachers/{teacherId}/subjects")
     public ApiResponse<List<SubjectResponse>> teacherSubjects(@PathVariable Long teacherId) {
         return ApiResponse.ok(timetableService.getSubjectsForTeacher(teacherId));
+    }
+
+    @GetMapping("/class-sections/{classSectionId}/export")
+    public ResponseEntity<byte[]> exportClassTimetable(@PathVariable Long classSectionId) {
+        byte[] xlsx = timetableService.exportClassTimetableXlsx(classSectionId);
+        return ResponseEntity.ok()
+                .contentType(XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=timetable-class-" + classSectionId + ".xlsx")
+                .body(xlsx);
+    }
+
+    @GetMapping("/teachers/{teacherId}/export")
+    public ResponseEntity<byte[]> exportTeacherTimetable(@PathVariable Long teacherId) {
+        byte[] xlsx = timetableService.exportTeacherTimetableXlsx(teacherId);
+        return ResponseEntity.ok()
+                .contentType(XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=timetable-teacher-" + teacherId + ".xlsx")
+                .body(xlsx);
     }
 }

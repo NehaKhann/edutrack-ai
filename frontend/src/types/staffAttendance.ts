@@ -1,5 +1,5 @@
 export type TeacherAttendanceStatus = "PRESENT" | "ABSENT" | "ON_LEAVE" | "LATE" | "HALF_DAY";
-export type AttendanceMethod = "MANUAL" | "FACE_RECOGNITION";
+export type AttendanceMethod = "MANUAL" | "FACE_RECOGNITION" | "FINGERPRINT" | "AUTO" | "PRINCIPAL_OVERRIDE";
 export type LeaveType = "SICK" | "CASUAL" | "EMERGENCY" | "OTHER";
 export type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
@@ -7,6 +7,33 @@ export interface MyTodayStatus {
   status: TeacherAttendanceStatus | null;
   method: AttendanceMethod | null;
   markedAt: string | null;
+}
+
+export interface MyAttendanceSummary {
+  weekPresent: number;
+  weekAbsent: number;
+  weekLate: number;
+  weekOnLeave: number;
+  weekHalfDay: number;
+  monthAttendancePercent: number;
+}
+
+export interface AttendancePolicy {
+  cutoffTime: string;
+  autoAbsentTime: string;
+}
+
+export interface AttendanceCorrectionRequest {
+  id: number;
+  teacherId: number;
+  teacherName: string;
+  attendanceDate: string;
+  requestedStatus: TeacherAttendanceStatus | null;
+  reason: string;
+  status: LeaveStatus;
+  reviewedByName: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
 }
 
 export interface LeaveRequest {

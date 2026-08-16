@@ -33,8 +33,10 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
       },
       devOptions: {
-        // Lets us test installability against the Vite dev server too, not just a production build.
-        enabled: true,
+        // Off while we're actively iterating: a dev-mode service worker can serve a stale cached
+        // app shell and make code changes look like they "need a refresh" to show up. Flip back to
+        // true only when specifically testing PWA installability against the dev server.
+        enabled: false,
         type: "module",
       },
     }),
