@@ -13,12 +13,13 @@ import { listTeachers } from "../../api/teachers";
 import * as staffApi from "../../api/staffAttendance";
 import { errorMessage } from "../../api/client";
 import { formatDate } from "../../utils/date";
+import { isoDate } from "../../lib/download";
 import type { Subject } from "../../types";
 import type { LeaveBalance, LeaveRequest, LeaveType } from "../../types/staffAttendance";
 import type { TeacherSummary } from "../../types/roster";
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDate(new Date());
 }
 
 const LEAVE_TYPES: { value: LeaveType; label: string }[] = [

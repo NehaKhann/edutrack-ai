@@ -18,17 +18,18 @@ import { Spinner } from "../../components/Spinner";
 import { getMySubjects } from "../../api/subjects";
 import * as diaryApi from "../../api/diary";
 import { errorMessage } from "../../api/client";
+import { isoDate } from "../../lib/download";
 import type { Subject } from "../../types";
 import type { DiaryEntry } from "../../types/diary";
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDate(new Date());
 }
 
 function addDays(dateStr: string, delta: number): string {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
+  return isoDate(d);
 }
 
 function formatTime(iso: string): string {

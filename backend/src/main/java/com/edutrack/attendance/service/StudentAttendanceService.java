@@ -58,6 +58,11 @@ public class StudentAttendanceService {
 
     @Transactional
     public void bulkMark(BulkAttendanceRequest request) {
+        // JVM default zone is Asia/Karachi (set in the Dockerfile) so LocalDate.now() matches the
+        // school's actual calendar day, not the container's underlying UTC clock.
+        if (!request.date().equals(LocalDate.now())) {
+            throw ApiException.badRequest("Attendance can only be marked for today's date.");
+        }
         ClassSection classSection = assertAccessible(request.classSectionId(), request.subjectId());
         Subject subject = request.subjectId() == null ? null : subjectRepository.findById(request.subjectId())
                 .orElseThrow(() -> ApiException.notFound("Subject not found"));

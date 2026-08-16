@@ -15,6 +15,7 @@ import { SegmentedControl, type SegmentedOption } from "../../components/Segment
 import * as staffApi from "../../api/staffAttendance";
 import * as faceApi from "../../api/faceRecognition";
 import { errorMessage } from "../../api/client";
+import { isoDate } from "../../lib/download";
 import type { FaceStatus } from "../../types/face";
 import type {
   AttendanceCorrectionRequest,
@@ -25,13 +26,13 @@ import type {
 } from "../../types/staffAttendance";
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDate(new Date());
 }
 
 function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  return isoDate(d);
 }
 
 function formatFullDate(iso: string): string {

@@ -21,6 +21,7 @@ import { useAuth } from "../auth/AuthContext";
 import * as calendarApi from "../api/calendar";
 import { errorMessage } from "../api/client";
 import { formatDate } from "../utils/date";
+import { isoDate } from "../lib/download";
 import { DAYS_OF_WEEK, type DayOfWeek } from "../types/profile";
 import type { DayOverride, DayStatus, DayStatusInfo, MonthView } from "../types/calendar";
 
@@ -506,7 +507,7 @@ function BulkUpdateCard({
   onDone: (v: { year: number; month: number }) => void;
   onError: (e: unknown) => void;
 }) {
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = isoDate(new Date());
   const [startDate, setStartDate] = useState(todayIso);
   const [endDate, setEndDate] = useState(todayIso);
   const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek | "">("");

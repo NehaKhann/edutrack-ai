@@ -39,6 +39,7 @@ import { formatDate, formatDateRange } from "../../utils/date";
 import { getMySubjects } from "../../api/subjects";
 import * as syllabusApi from "../../api/syllabus";
 import { errorMessage } from "../../api/client";
+import { isoDate } from "../../lib/download";
 import type { DocumentPreviewInfo, Subject, SyllabusDto, SyllabusDocument, Topic } from "../../types";
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".webp"];
@@ -242,7 +243,7 @@ function NewSyllabusForm({
   onCancel: () => void;
 }) {
   const [term, setTerm] = useState("Term 1, 2026");
-  const [termStartDate, setTermStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [termStartDate, setTermStartDate] = useState(isoDate(new Date()));
   const [files, setFiles] = useState<File[]>([]);
   const [showManual, setShowManual] = useState(false);
   const [manualText, setManualText] = useState("");
@@ -1473,7 +1474,7 @@ function TopicRow({
     );
   }
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = isoDate(new Date());
   const isOverdue = !topic.covered && topic.plannedEndDate < todayIso;
   const accentClass = topic.covered
     ? "border-l-teal-400"

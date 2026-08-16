@@ -27,12 +27,13 @@ import { getMySubjects } from "../../api/subjects";
 import * as attendanceApi from "../../api/attendance";
 import * as studentsApi from "../../api/students";
 import { errorMessage } from "../../api/client";
+import { isoDate } from "../../lib/download";
 import type { Subject } from "../../types";
 import type { ClassSectionSummary, Student } from "../../types/roster";
 import type { StudentAttendanceStatus } from "../../types/attendance";
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDate(new Date());
 }
 
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -266,7 +267,7 @@ export function AttendancePage() {
         <CardBody className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">
             <Field label="Date">
-              <DatePicker value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+              <DatePicker value={date} onChange={(e) => setDate(e.target.value)} minDate={today()} maxDate={today()} className="w-40" />
             </Field>
             <ClassSectionPicker
               classSections={classSections}

@@ -21,16 +21,12 @@ import * as classSectionsApi from "../../api/classSections";
 import { listClassSections } from "../../api/classSections";
 import { errorMessage } from "../../api/client";
 import { formatDate } from "../../utils/date";
-import { downloadBlob } from "../../lib/download";
+import { downloadBlob, isoDate } from "../../lib/download";
 import type { ClassSectionSummary, Student, StudentImportResult } from "../../types/roster";
 import type { ClassAttendanceSummary, StudentAttendanceRow } from "../../types/attendance";
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 export function AttendanceDashboardPage() {
-  const [date, setDate] = useState(today());
+  const [date, setDate] = useState(isoDate(new Date()));
   const [summary, setSummary] = useState<ClassAttendanceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +51,7 @@ export function AttendanceDashboardPage() {
     const days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      return d.toISOString().slice(0, 10);
+      return isoDate(d);
     });
     Promise.all(days.map((d) => attendanceApi.getAttendanceSummary(d).catch(() => [] as ClassAttendanceSummary[]))).then((results) => {
       setTrend(

@@ -231,7 +231,7 @@ export function TeacherAttendancePage() {
 
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Today — {formatDate(new Date().toISOString().slice(0, 10))}</h3>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Today — {formatDate(isoDate(new Date()))}</h3>
           <div className="flex flex-wrap gap-2">
             {(
               [

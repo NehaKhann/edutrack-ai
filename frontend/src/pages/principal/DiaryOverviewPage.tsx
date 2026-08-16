@@ -24,7 +24,7 @@ function submittedTime(iso: string): string {
 }
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return isoDate(new Date());
 }
 
 export function DiaryOverviewPage() {
