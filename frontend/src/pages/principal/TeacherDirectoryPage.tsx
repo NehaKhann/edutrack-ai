@@ -141,11 +141,11 @@ export function TeacherDirectoryPage() {
         title="Teacher Directory"
         description="Every teacher's profile, subjects, and timetable in one place."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" onClick={() => setAccountsModalOpen(true)}>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setAccountsModalOpen(true)}>
               <UserPlusIcon className="h-4 w-4" /> Manage Teacher Accounts
             </Button>
-            <Button variant="secondary" onClick={() => setSubjectsModalOpen(true)}>
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setSubjectsModalOpen(true)}>
               <Squares2X2Icon className="h-4 w-4" /> Manage Subjects
             </Button>
           </div>

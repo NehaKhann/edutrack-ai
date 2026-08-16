@@ -134,11 +134,11 @@ export function TeacherAttendancePage() {
         title="Teacher Attendance"
         description="Today's staff attendance, leave requests, and class-skip reports."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => setExportOpen(true)}>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => setExportOpen(true)}>
               <ArrowDownTrayIcon className="h-4 w-4" /> Export
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setPolicyOpen(true)}>
+            <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => setPolicyOpen(true)}>
               <Cog6ToothIcon className="h-4 w-4" /> Attendance Policy
             </Button>
           </div>

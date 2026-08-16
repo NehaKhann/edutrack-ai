@@ -88,11 +88,11 @@ export function AttendanceDashboardPage() {
         title="Attendance Dashboard"
         description="Today's attendance completion across every class."
         actions={
-          <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={() => setClassesModalOpen(true)}>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setClassesModalOpen(true)}>
               <Squares2X2Icon className="h-4 w-4" /> Manage Classes
             </Button>
-            <Button variant="secondary" onClick={() => setRosterOpen(true)}>
+            <Button variant="secondary" className="w-full sm:w-auto" onClick={() => setRosterOpen(true)}>
               <UsersIcon className="h-4 w-4" /> Manage Roster
             </Button>
           </div>

@@ -157,7 +157,7 @@ export function HomePage() {
             <SkeletonRows count={2} />
           ) : attentionItems.length === 0 ? (
             <div className="flex items-center gap-2.5 py-2 text-sm text-slate-500 dark:text-slate-400">
-              <CheckCircleIcon className="h-4.5 w-4.5 text-teal-500" />
+              <CheckCircleIcon className="h-5 w-5 text-teal-500" />
               All caught up — nothing needs your review right now.
             </div>
           ) : (
@@ -220,7 +220,7 @@ export function HomePage() {
               <Card key={link.to} interactive onClick={() => navigate(link.to)} className="cursor-pointer">
                 <CardBody className="flex flex-col items-start gap-2.5 py-5">
                   <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
-                    <link.icon className="h-4.5 w-4.5" />
+                    <link.icon className="h-5 w-5" />
                   </span>
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{link.label}</span>
                 </CardBody>
