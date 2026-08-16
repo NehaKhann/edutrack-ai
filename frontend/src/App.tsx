@@ -10,6 +10,7 @@ import { AttendancePage } from "./pages/teacher/AttendancePage";
 import { MyAttendancePage } from "./pages/teacher/MyAttendancePage";
 import { LeaveAndSkipPage } from "./pages/teacher/LeaveAndSkipPage";
 import { MyTimetablePage } from "./pages/teacher/MyTimetablePage";
+import { HomePage } from "./pages/principal/HomePage";
 import { CoverageGridPage } from "./pages/principal/CoverageGridPage";
 import { TeacherDirectoryPage } from "./pages/principal/TeacherDirectoryPage";
 import { DiaryOverviewPage } from "./pages/principal/DiaryOverviewPage";
@@ -27,7 +28,7 @@ function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === "TEACHER" && user.mustChangePassword) return <Navigate to="/teacher/profile" replace />;
-  return <Navigate to={user.role === "TEACHER" ? "/teacher/lesson-plan" : "/principal/coverage"} replace />;
+  return <Navigate to={user.role === "TEACHER" ? "/teacher/lesson-plan" : "/principal/home"} replace />;
 }
 
 export default function App() {
@@ -57,6 +58,7 @@ export default function App() {
           </Route>
 
           <Route element={<ProtectedRoute allow={["PRINCIPAL", "ADMIN"]} />}>
+            <Route path="/principal/home" element={<HomePage />} />
             <Route path="/principal/coverage" element={<CoverageGridPage />} />
             <Route path="/principal/timetable" element={<TimetablePage />} />
             <Route path="/principal/teachers" element={<TeacherDirectoryPage />} />

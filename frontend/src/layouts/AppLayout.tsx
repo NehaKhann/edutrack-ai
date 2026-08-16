@@ -7,6 +7,7 @@ import {
   CalendarDaysIcon,
   CalendarIcon,
   BookOpenIcon,
+  HomeIcon,
   Squares2X2Icon,
   ArrowRightStartOnRectangleIcon,
   UserCircleIcon,
@@ -58,6 +59,7 @@ const teacherNav: NavItem[] = [
 ];
 
 const principalNav: NavItem[] = [
+  { to: "/principal/home", label: "Home", icon: HomeIcon, section: "main" },
   { to: "/principal/coverage", label: "Coverage Grid", icon: Squares2X2Icon, section: "main" },
   { to: "/principal/timetable", label: "Timetable", icon: TableCellsIcon, section: "main" },
   { to: "/principal/diary", label: "Class Diary", icon: PencilSquareIcon, section: "main" },
