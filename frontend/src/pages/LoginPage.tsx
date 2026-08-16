@@ -33,18 +33,24 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [wakingUp, setWakingUp] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    // Free-tier backends sleep after ~15 min idle; the first request can take 30-60s to wake one up.
+    // Without this, that delay looks identical to a hung/broken app — so surface it after a few seconds.
+    const wakeUpTimer = setTimeout(() => setWakingUp(true), 4000);
     try {
       await login(email, password);
       navigate((location.state as any)?.from ?? "/", { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      clearTimeout(wakeUpTimer);
+      setWakingUp(false);
       setLoading(false);
     }
   }
@@ -169,6 +175,11 @@ export function LoginPage() {
             <Button type="submit" size="lg" className="w-full tracking-wide" loading={loading}>
               Sign in
             </Button>
+            {wakingUp && (
+              <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+                Waking up the server &mdash; this can take up to a minute after a period of inactivity.
+              </p>
+            )}
           </form>
 
           {import.meta.env.DEV && (

@@ -22,10 +22,14 @@ import {
   TableCellsIcon,
   ChatBubbleLeftRightIcon,
   ShieldCheckIcon,
+  KeyIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../auth/AuthContext";
 import { AmbientBackground } from "../components/AmbientBackground";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { ChangePasswordModal } from "../components/ChangePasswordModal";
+import { Toast } from "../components/Toast";
 import * as notificationsApi from "../api/notifications";
 import * as chatApi from "../api/chat";
 import * as realtime from "../lib/realtime";
@@ -112,6 +116,8 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordToast, setPasswordToast] = useState<string | null>(null);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -232,9 +238,13 @@ export function AppLayout() {
             <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 ring-1 ring-inset ring-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20">
               {roleLabel}
             </span>
-            <div className="hidden h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm sm:grid">
-              {initialsOf(user.name)}
-            </div>
+            {user.role === "TEACHER" ? (
+              <div className="hidden h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm sm:grid">
+                {initialsOf(user.name)}
+              </div>
+            ) : (
+              <UserMenu onChangePassword={() => setPasswordModalOpen(true)} />
+            )}
           </div>
         </header>
 
@@ -252,6 +262,18 @@ export function AppLayout() {
           </AnimatePresence>
         </main>
       </div>
+
+      {user.role !== "TEACHER" && (
+        <ChangePasswordModal
+          open={passwordModalOpen}
+          onClose={() => setPasswordModalOpen(false)}
+          onChanged={() => {
+            setPasswordModalOpen(false);
+            setPasswordToast("Password changed successfully.");
+          }}
+        />
+      )}
+      <Toast message={passwordToast} onClose={() => setPasswordToast(null)} />
     </div>
   );
 }
@@ -286,6 +308,110 @@ function ChatUnreadBadge() {
     <span className="ml-auto grid h-5 min-w-[1.25rem] shrink-0 place-items-center rounded-full bg-coral-500 px-1.5 text-[10px] font-bold text-white">
       {count > 99 ? "99+" : count}
     </span>
+  );
+}
+
+function UserMenu({ onChangePassword }: { onChangePassword: () => void }) {
+  const { user, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<{ top: number; right: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    function updateRect() {
+      const el = triggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.bottom, right: window.innerWidth - r.right });
+    }
+    updateRect();
+    function handlePointer(e: MouseEvent) {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    window.addEventListener("scroll", updateRect, true);
+    window.addEventListener("resize", updateRect);
+    document.addEventListener("mousedown", handlePointer);
+    return () => {
+      window.removeEventListener("scroll", updateRect, true);
+      window.removeEventListener("resize", updateRect);
+      document.removeEventListener("mousedown", handlePointer);
+    };
+  }, [open]);
+
+  if (!user) return null;
+  const roleLabel = user.role === "PRINCIPAL" ? "Principal" : "Admin";
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        onClick={() => setOpen((v) => !v)}
+        aria-label="Account menu"
+        aria-expanded={open}
+        className="hidden items-center gap-1.5 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-slate-100 dark:hover:bg-white/[0.08] sm:flex"
+      >
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm">
+          {initialsOf(user.name)}
+        </div>
+        <ChevronDownIcon className={clsx("h-3.5 w-3.5 text-slate-400 transition-transform dark:text-slate-500", open && "rotate-180")} />
+      </button>
+
+      {createPortal(
+        <AnimatePresence>
+          {open && rect && (
+            <motion.div
+              ref={panelRef}
+              initial={{ opacity: 0, y: -4, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.98 }}
+              transition={{ duration: 0.12 }}
+              style={{ position: "fixed", top: rect.top + 8, right: rect.right }}
+              className="z-50 w-64 max-w-[90vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-navy-800"
+            >
+              <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 dark:border-white/[0.08]">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-coral-500 to-amber-400 text-xs font-bold text-white shadow-sm">
+                  {initialsOf(user.name)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{user.name}</p>
+                  <p className="truncate text-xs text-slate-400 dark:text-slate-500">{user.email}</p>
+                </div>
+              </div>
+              <div className="py-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    onChangePassword();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/[0.05]"
+                >
+                  <KeyIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  Change password
+                </button>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-white/[0.05]"
+                >
+                  <ArrowRightStartOnRectangleIcon className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  Sign out
+                </button>
+              </div>
+              <div className="border-t border-slate-100 px-4 py-2 dark:border-white/[0.08]">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">{roleLabel}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+    </>
   );
 }
 

@@ -2,7 +2,7 @@
 
 An AI-powered school operations platform that mirrors a real school term end-to-end — syllabus planning, attendance, class diary, teacher leave management, and performance tracking — built on a free/open-source stack so it's realistic for a resource-constrained school to actually run.
 
-**Live**: deployed and running at [edutrack-ai.n-nehakhan333.workers.dev](https://edutrack-ai.n-nehakhan333.workers.dev), installable as a mobile app (PWA today, native Android in progress — see [Deployment](#deployment)).
+**Live demo**: [edutrack-ai.n-nehakhan333.workers.dev](https://edutrack-ai.n-nehakhan333.workers.dev), installable as a mobile app (PWA today, native Android in progress — see [Deployment](#deployment)). This demo runs on its own backend and database, seeded with fake data — it is fully isolated from any real school's deployment of this app, so cloning this repo or using the public demo never touches real school data (see [Deployment](#deployment)).
 
 See [What's implemented](#whats-implemented) below for the full feature breakdown, and [TESTING.md](TESTING.md) for a role-by-role QA flow guide (e.g. "Teacher marks attendance → Principal sees it").
 
@@ -12,7 +12,7 @@ See [What's implemented](#whats-implemented) below for the full feature breakdow
 |---|---|
 | Backend | Spring Boot 3 (Java 17), Spring Security + JWT, Spring Data JPA, Flyway migrations |
 | Frontend | React 18 + TypeScript (Vite), Tailwind CSS, Framer Motion, installable PWA (`vite-plugin-pwa`) |
-| Mobile | Capacitor Android wrapper pointed at the live deployed URL — feature/content updates ship instantly with no app rebuild; only native-level changes (icon, name, native plugins) need a new build |
+| Mobile | Capacitor Android wrapper pointed at a deployed URL — feature/content updates ship instantly with no app rebuild; only native-level changes (icon, name, native plugins) need a new build. Each real school's app build points at that school's own private backend, never the public demo (see [Deployment](#deployment)) |
 | Database | PostgreSQL — local via Docker in dev, [Neon](https://neon.tech) (free serverless Postgres) in production |
 | LLM | [Groq](https://groq.com) (hosted, free tier) in production, [Ollama](https://ollama.com) (local) in dev — switched purely via the `LLM_PROVIDER` env var, no code changes between environments |
 | File storage | Local disk in dev, [Cloudflare R2](https://developers.cloudflare.com/r2/) (free tier, S3-compatible) in production — switched purely via the `STORAGE_PROVIDER` env var. Needed because most free app hosts (e.g. Render) wipe local disk on every redeploy; R2 doesn't. |
@@ -47,6 +47,8 @@ The database auto-migrates and seeds demo data on first boot. Sign in with any o
 | Teacher (Math, Grade 6 & 7) | `sana.tariq@edutrack.school` |
 | Teacher (English/Urdu) | `bilal.ahmed@edutrack.school` |
 | Admin | `admin@edutrack.school` |
+
+These credentials only apply to a local dev instance or the public demo above, both seeded with fake data. A real school's private deployment is provisioned with its own separate accounts and passwords, set directly in its own database — never documented in this repo.
 
 ### Local dev without Docker
 
@@ -140,11 +142,15 @@ See **[TESTING.md](TESTING.md)** for the full manual QA guide — organized as r
 | File storage | [Cloudflare R2](https://developers.cloudflare.com/r2/) — S3-compatible, needed because Render's disk is wiped on every redeploy |
 | LLM | [Groq](https://groq.com) — free tier, `LLM_PROVIDER=groq` |
 
-**Live URL**: https://edutrack-ai.n-nehakhan333.workers.dev
+**Live demo URL**: https://edutrack-ai.n-nehakhan333.workers.dev — seeded with fake demo data only.
 
-No self-registration exists anywhere in the app — the Principal account is provisioned once directly in the database, and every Teacher account after that is created from inside the app by the Principal.
+### Public demo vs. a real school's deployment
 
-**Mobile app**: installable today as a PWA (Add to Home Screen, on Android or iPhone, no store needed). A native Android build also exists (`frontend/android/`, via [Capacitor](https://capacitorjs.com)) — it wraps the same live URL rather than bundling a static copy, so every deploy shows up in the app immediately with no rebuild. Only a genuinely native change (icon, app name, a native-only plugin) needs a new APK build. iOS is blocked on needing a Mac (or a paid cloud Mac CI) to build — not yet done.
+This repo, and the demo URL above, are public — so a real school's data can never live behind them. Each real school gets its own **fully separate stack**: its own Render backend, its own Neon database, its own Cloudflare Workers frontend, and its own set of accounts/credentials, all provisioned independently of the public demo and not linked from this repo. Cloning this repo or using the public demo gives access only to the demo's own fake seed data — never a real school's data, since the two don't share a backend, a database, or credentials at any point.
+
+No self-registration exists anywhere in the app — a school's Principal account is provisioned once directly in that school's own database, and every Teacher account after that is created from inside the app by the Principal.
+
+**Mobile app**: installable today as a PWA (Add to Home Screen, on Android or iPhone, no store needed). A native Android build also exists (`frontend/android/`, via [Capacitor](https://capacitorjs.com)) — it wraps a deployed URL rather than bundling a static copy, so every deploy shows up in the app immediately with no rebuild. Only a genuinely native change (icon, app name, a native-only plugin) needs a new APK build. Each school's app build is compiled to point at that school's own private backend, not the public demo. iOS is blocked on needing a Mac (or a paid cloud Mac CI) to build — not yet done.
 
 ## Project layout
 
