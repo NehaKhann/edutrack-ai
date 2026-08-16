@@ -341,9 +341,16 @@ function RosterModal({ onClose }: { onClose: () => void }) {
     listClassSections()
       .then((cs) => {
         setClassSections(cs);
-        if (cs.length > 0) setClassSectionId(cs[0].id);
+        if (cs.length > 0) {
+          setClassSectionId(cs[0].id);
+        } else {
+          setLoading(false);
+        }
       })
-      .catch((e) => setError(errorMessage(e)));
+      .catch((e) => {
+        setError(errorMessage(e));
+        setLoading(false);
+      });
   }, []);
 
   function refreshStudents() {

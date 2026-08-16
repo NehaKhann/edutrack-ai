@@ -902,10 +902,17 @@ function ManageSubjectsModal({ onClose }: { onClose: () => void }) {
       .then(([cs, ts]) => {
         setClassSections(cs);
         setTeachers(ts);
-        if (cs.length > 0) setClassSectionId(cs[0].id);
+        if (cs.length > 0) {
+          setClassSectionId(cs[0].id);
+        } else {
+          setLoading(false);
+        }
         if (ts.length > 0) setNewSubjectTeacherId(ts[0].id);
       })
-      .catch((e) => setError(errorMessage(e)));
+      .catch((e) => {
+        setError(errorMessage(e));
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {

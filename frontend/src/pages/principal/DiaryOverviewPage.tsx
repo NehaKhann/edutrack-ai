@@ -43,9 +43,16 @@ export function DiaryOverviewPage() {
     listClassSections()
       .then((cs) => {
         setClassSections(cs);
-        if (cs.length > 0) setClassSectionId(cs[0].id);
+        if (cs.length > 0) {
+          setClassSectionId(cs[0].id);
+        } else {
+          setLoading(false);
+        }
       })
-      .catch((e) => setError(errorMessage(e)));
+      .catch((e) => {
+        setError(errorMessage(e));
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -65,6 +72,23 @@ export function DiaryOverviewPage() {
   const notSubmitted = rows.filter((r) => !r.entry || r.entry.status !== "SUBMITTED");
   const submittedCount = rows.length - notSubmitted.length;
   const className = classSections.find((c) => c.id === classSectionId)?.name ?? "";
+
+  if (!loading && classSections.length === 0) {
+    return (
+      <div>
+        <PageHeader title="Class Diary Overview" description="See what's been assigned across every subject, for any class." />
+        {error && (
+          <div className="mb-4">
+            <Alert type="error">{error}</Alert>
+          </div>
+        )}
+        <EmptyState
+          title="No classes yet"
+          description="Create a class section first, from Class Attendance → Manage Classes, then diary entries will show up here."
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
