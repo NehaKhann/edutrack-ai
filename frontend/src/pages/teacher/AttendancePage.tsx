@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { CheckCircleIcon, UsersIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  CheckCircleIcon,
+  UsersIcon,
+  PlusIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+} from "@heroicons/react/24/outline";
+import { CheckIcon } from "@heroicons/react/24/solid";
 import { PageHeader } from "../../components/PageHeader";
 import { Card, CardBody, CardHeader } from "../../components/Card";
 import { Button } from "../../components/Button";
@@ -9,7 +19,6 @@ import { DatePicker } from "../../components/DatePicker";
 import { Alert } from "../../components/Alert";
 import { SkeletonRows } from "../../components/Skeleton";
 import { Toast } from "../../components/Toast";
-import { SegmentedControl, type SegmentedOption } from "../../components/SegmentedControl";
 import { ClassSectionPicker } from "../../components/ClassSectionPicker";
 import { Modal } from "../../components/Modal";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -26,41 +35,91 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-const STATUS_OPTIONS: SegmentedOption<StudentAttendanceStatus>[] = [
-  { value: "PRESENT", label: "P", activeClass: "bg-teal-500 text-white", activeGlowClass: "shadow-glow-teal" },
-  { value: "ABSENT", label: "A", activeClass: "bg-coral-500 text-white", activeGlowClass: "shadow-glow-coral" },
-  { value: "LATE", label: "L", activeClass: "bg-amber-500 text-white", activeGlowClass: "shadow-glow-amber" },
-  { value: "LEAVE", label: "Lv", activeClass: "bg-blue-500 text-white", activeGlowClass: "shadow-[0_8px_24px_-6px_rgba(59,130,246,0.4)]" },
-];
-
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-const STATUS_META: Record<StudentAttendanceStatus, { label: string; dot: string; text: string; ring: string }> = {
+// Distinct, theme-safe colors per status — kept local to this page rather than the app's usual
+// teal/coral convention, since a marking grid benefits from unambiguous red/green/amber/blue at a glance.
+const STATUS_META: Record<
+  StudentAttendanceStatus,
+  { label: string; short: string; dot: string; text: string; solid: string; ring: string; rowHover: string }
+> = {
   PRESENT: {
     label: "Present",
-    dot: "bg-teal-500",
-    text: "text-teal-600 dark:text-teal-400",
-    ring: "border-teal-300 bg-teal-50/70 dark:border-teal-500/40 dark:bg-teal-500/[0.08]",
+    short: "P",
+    dot: "bg-green-500",
+    text: "text-green-600 dark:text-green-400",
+    solid: "bg-green-600 text-white shadow-[0_4px_14px_-4px_rgba(22,163,74,0.55)] dark:bg-green-500",
+    ring: "border-green-300 bg-green-50/80 dark:border-green-500/40 dark:bg-green-500/[0.1]",
+    rowHover: "hover:bg-green-100/70 dark:hover:bg-green-500/[0.16]",
   },
   ABSENT: {
     label: "Absent",
-    dot: "bg-coral-500",
-    text: "text-coral-600 dark:text-coral-400",
-    ring: "border-coral-300 bg-coral-50/70 dark:border-coral-500/40 dark:bg-coral-500/[0.08]",
+    short: "A",
+    dot: "bg-red-500",
+    text: "text-red-600 dark:text-red-400",
+    solid: "bg-red-600 text-white shadow-[0_4px_14px_-4px_rgba(220,38,38,0.55)] dark:bg-red-500",
+    ring: "border-red-300 bg-red-50/80 dark:border-red-500/40 dark:bg-red-500/[0.1]",
+    rowHover: "hover:bg-red-100/70 dark:hover:bg-red-500/[0.16]",
   },
   LATE: {
     label: "Late",
+    short: "L",
     dot: "bg-amber-500",
     text: "text-amber-600 dark:text-amber-400",
-    ring: "border-amber-300 bg-amber-50/70 dark:border-amber-500/40 dark:bg-amber-500/[0.08]",
+    solid: "bg-amber-500 text-white shadow-[0_4px_14px_-4px_rgba(217,119,6,0.55)] dark:bg-amber-500",
+    ring: "border-amber-300 bg-amber-50/80 dark:border-amber-500/40 dark:bg-amber-500/[0.1]",
+    rowHover: "hover:bg-amber-100/70 dark:hover:bg-amber-500/[0.16]",
   },
   LEAVE: {
     label: "Leave",
+    short: "Lv",
     dot: "bg-blue-500",
     text: "text-blue-600 dark:text-blue-400",
-    ring: "border-blue-300 bg-blue-50/70 dark:border-blue-500/40 dark:bg-blue-500/[0.08]",
+    solid: "bg-blue-600 text-white shadow-[0_4px_14px_-4px_rgba(37,99,235,0.55)] dark:bg-blue-500",
+    ring: "border-blue-300 bg-blue-50/80 dark:border-blue-500/40 dark:bg-blue-500/[0.1]",
+    rowHover: "hover:bg-blue-100/70 dark:hover:bg-blue-500/[0.16]",
   },
 };
+
+const STATUS_ORDER: StudentAttendanceStatus[] = ["PRESENT", "ABSENT", "LATE", "LEAVE"];
+
+function StatusButtonGroup({
+  value,
+  onChange,
+}: {
+  value: StudentAttendanceStatus | null | undefined;
+  onChange: (status: StudentAttendanceStatus) => void;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1.5" role="group" aria-label="Attendance status">
+      {STATUS_ORDER.map((status) => {
+        const meta = STATUS_META[status];
+        const active = value === status;
+        return (
+          <button
+            key={status}
+            type="button"
+            onClick={() => onChange(status)}
+            aria-pressed={active}
+            aria-label={meta.label}
+            title={meta.label}
+            className={clsx(
+              "flex h-8 min-w-[2.25rem] items-center justify-center rounded-lg px-2 text-xs font-bold transition-all duration-150",
+              active
+                ? clsx(meta.solid, "scale-105")
+                : clsx(
+                    "border border-slate-200 bg-white/70 hover:scale-105 hover:border-slate-300 dark:border-white/15 dark:bg-white/5 dark:hover:border-white/25",
+                    meta.text
+                  )
+            )}
+          >
+            {active ? <CheckIcon className="h-4 w-4" /> : meta.short}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 export function AttendancePage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -80,6 +139,9 @@ export function AttendancePage() {
   const [rosterVersion, setRosterVersion] = useState(0);
   const [sortBy, setSortBy] = useState<"roll" | "name">("roll");
   const [statusFilter, setStatusFilter] = useState<StudentAttendanceStatus | null>(null);
+  const [search, setSearch] = useState("");
+  const [markAllConfirmOpen, setMarkAllConfirmOpen] = useState(false);
+  const [undoMarks, setUndoMarks] = useState<Record<number, StudentAttendanceStatus> | null>(null);
 
   const classSections = useMemo(() => {
     const map = new Map<number, ClassSectionSummary>();
@@ -102,9 +164,12 @@ export function AttendancePage() {
   }, [roster, sortBy]);
 
   const visibleRoster = useMemo(() => {
-    if (!statusFilter) return sortedRoster;
-    return sortedRoster.filter((s) => marks[s.studentId] === statusFilter);
-  }, [sortedRoster, marks, statusFilter]);
+    let list = sortedRoster;
+    if (statusFilter) list = list.filter((s) => marks[s.studentId] === statusFilter);
+    const q = search.trim().toLowerCase();
+    if (q) list = list.filter((s) => s.name.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q));
+    return list;
+  }, [sortedRoster, marks, statusFilter, search]);
 
   useEffect(() => {
     getMySubjects()
@@ -139,12 +204,21 @@ export function AttendancePage() {
       .catch((e) => setError(errorMessage(e)))
       .finally(() => setLoading(false));
     setStatusFilter(null);
+    setUndoMarks(null);
   }, [classSectionId, date, mode, subjectId, period, rosterVersion]);
 
-  function markAllPresent() {
+  function confirmMarkAllPresent() {
     const next: Record<number, StudentAttendanceStatus> = {};
     roster.forEach((s) => (next[s.studentId] = "PRESENT"));
+    setUndoMarks(marks);
     setMarks(next);
+    setMarkAllConfirmOpen(false);
+    setToast(`Marked all ${roster.length} students present.`);
+  }
+
+  function handleUndoMarkAll() {
+    if (undoMarks) setMarks(undoMarks);
+    setUndoMarks(null);
   }
 
   const counts = { PRESENT: 0, ABSENT: 0, LATE: 0, LEAVE: 0 } as Record<StudentAttendanceStatus, number>;
@@ -152,6 +226,7 @@ export function AttendancePage() {
   const markedCount = Object.keys(marks).length;
   const presentPercent = markedCount > 0 ? Math.round((counts.PRESENT / markedCount) * 100) : 0;
   const attendancePercent = markedCount > 0 ? Math.round(((counts.PRESENT + counts.LATE) / markedCount) * 100) : 0;
+  const markedProgressPercent = roster.length > 0 ? Math.round((markedCount / roster.length) * 100) : 0;
 
   async function handleSubmit() {
     if (!classSectionId) return;
@@ -204,15 +279,25 @@ export function AttendancePage() {
               <div className="inline-flex rounded-lg border border-slate-300 bg-white/80 p-0.5 dark:border-white/15 dark:bg-white/5">
                 <button
                   onClick={() => setMode("daily")}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "daily" ? "bg-brand-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
+                  className={clsx(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                    mode === "daily"
+                      ? "bg-brand-600 text-white shadow-glow-brand"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  )}
                 >
-                  Daily
+                  <CalendarDaysIcon className="h-3.5 w-3.5" /> Daily
                 </button>
                 <button
                   onClick={() => setMode("period")}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${mode === "period" ? "bg-brand-600 text-white" : "text-slate-500 dark:text-slate-400"}`}
+                  className={clsx(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                    mode === "period"
+                      ? "bg-brand-600 text-white shadow-glow-brand"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                  )}
                 >
-                  Period-wise
+                  <ClockIcon className="h-3.5 w-3.5" /> Period-wise
                 </button>
               </div>
             </Field>
@@ -275,7 +360,7 @@ export function AttendancePage() {
                   </button>
                 </div>
               )}
-              <Button size="sm" onClick={markAllPresent} disabled={roster.length === 0}>
+              <Button size="sm" onClick={() => setMarkAllConfirmOpen(true)} disabled={roster.length === 0}>
                 <CheckCircleIcon className="h-4 w-4" /> Mark All Present
               </Button>
             </div>
@@ -283,6 +368,24 @@ export function AttendancePage() {
 
           {roster.length > 0 && (
             <>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">{markedCount}</span> of{" "}
+                  {roster.length} marked
+                </p>
+                {markedCount === roster.length && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-500/10 dark:text-green-300">
+                    <CheckCircleIcon className="h-3.5 w-3.5" /> All marked
+                  </span>
+                )}
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/[0.08]">
+                <div
+                  className="h-full rounded-full bg-brand-500 transition-all duration-300"
+                  style={{ width: `${markedProgressPercent}%` }}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(Object.keys(STATUS_META) as StudentAttendanceStatus[]).map((status) => {
                   const meta = STATUS_META[status];
@@ -315,7 +418,7 @@ export function AttendancePage() {
               {markedCount > 0 && (
                 <div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/[0.08]">
-                    <div className="h-full rounded-full bg-teal-500 transition-all duration-300" style={{ width: `${presentPercent}%` }} />
+                    <div className="h-full rounded-full bg-green-500 transition-all duration-300" style={{ width: `${presentPercent}%` }} />
                   </div>
                   <p className="mt-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                     {presentPercent}% present · {attendancePercent}% attendance (present + late)
@@ -326,6 +429,28 @@ export function AttendancePage() {
           )}
         </CardHeader>
         <CardBody>
+          {roster.length > 0 && (
+            <div className="relative mb-3">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+              <TextInput
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or roll number..."
+                className="pl-9 pr-9"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-white/10 dark:hover:text-slate-300"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
+
           {loading ? (
             <SkeletonRows count={4} />
           ) : roster.length === 0 ? (
@@ -338,37 +463,44 @@ export function AttendancePage() {
           ) : visibleRoster.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-6 text-center">
               <p className="text-sm text-slate-400 dark:text-slate-500">
-                No {statusFilter && STATUS_META[statusFilter].label.toLowerCase()} students to show.
+                {search
+                  ? `No students match "${search}".`
+                  : `No ${statusFilter ? STATUS_META[statusFilter].label.toLowerCase() : ""} students to show.`}
               </p>
               <button
-                onClick={() => setStatusFilter(null)}
+                onClick={() => {
+                  setStatusFilter(null);
+                  setSearch("");
+                }}
                 className="text-xs font-semibold text-brand-600 hover:underline dark:text-brand-300"
               >
-                Clear filter
+                Clear filters
               </button>
             </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-white/[0.08]">
-              {visibleRoster.map((s) => (
-                <div
-                  key={s.studentId}
-                  className="flex items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04]"
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-[11px] font-bold text-white">
-                    {s.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{s.name}</p>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500">Roll No. {s.rollNumber}</p>
+              {visibleRoster.map((s) => {
+                const status = marks[s.studentId];
+                const meta = status ? STATUS_META[status] : null;
+                return (
+                  <div
+                    key={s.studentId}
+                    className={clsx(
+                      "flex items-center gap-3 rounded-lg border px-2.5 py-2.5 transition-colors duration-150",
+                      meta ? clsx(meta.ring, meta.rowHover) : "border-transparent hover:bg-slate-50 dark:hover:bg-white/[0.04]"
+                    )}
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-[11px] font-bold text-white">
+                      {s.name.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">{s.name}</p>
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">Roll No. {s.rollNumber}</p>
+                    </div>
+                    <StatusButtonGroup value={status} onChange={(v) => setMarks((m) => ({ ...m, [s.studentId]: v }))} />
                   </div>
-                  <SegmentedControl
-                    size="md"
-                    options={STATUS_OPTIONS}
-                    value={marks[s.studentId] ?? null}
-                    onChange={(v) => setMarks((m) => ({ ...m, [s.studentId]: v }))}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardBody>
@@ -381,7 +513,17 @@ export function AttendancePage() {
         )}
       </Card>
 
-      <Toast message={toast} onClose={() => setToast(null)} />
+      <Toast message={toast} onClose={() => setToast(null)} action={undoMarks ? { label: "Undo", onClick: handleUndoMarkAll } : undefined} />
+
+      <ConfirmModal
+        open={markAllConfirmOpen}
+        title="Mark all students present?"
+        message={`This will set all ${roster.length} students to Present for ${date}, overwriting any statuses already set. You can undo this right after.`}
+        confirmLabel="Mark all present"
+        danger={false}
+        onConfirm={confirmMarkAllPresent}
+        onCancel={() => setMarkAllConfirmOpen(false)}
+      />
 
       {rosterOpen && (
         <RosterModal

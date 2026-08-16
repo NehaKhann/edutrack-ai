@@ -15,11 +15,13 @@ export function Toast({
   type = "success",
   onClose,
   duration = 2600,
+  action,
 }: {
   message: string | null;
   type?: ToastType;
   onClose: () => void;
   duration?: number;
+  action?: { label: string; onClick: () => void };
 }) {
   useEffect(() => {
     if (!message) return;
@@ -41,6 +43,18 @@ export function Toast({
           >
             {type === "success" ? <CheckCircleIcon className="h-5 w-5 shrink-0" /> : <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />}
             {message}
+            {action && (
+              <button
+                type="button"
+                onClick={() => {
+                  action.onClick();
+                  onClose();
+                }}
+                className="ml-1 shrink-0 rounded-md px-1.5 py-0.5 text-sm font-bold underline underline-offset-2 hover:no-underline"
+              >
+                {action.label}
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
